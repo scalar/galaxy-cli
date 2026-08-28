@@ -97,8 +97,8 @@ jobs:
       - run: npm install -g npm@11
       - name: Publish to npm
         run: |
-          if npm view "scalargalaxy-cli@${PKG_VERSION}" version >/dev/null 2>&1; then
-            echo "scalargalaxy-cli@${PKG_VERSION} already published to npm, skipping"
+          if npm view "@scalar/galaxy-cli@${PKG_VERSION}" version >/dev/null 2>&1; then
+            echo "@scalar/galaxy-cli@${PKG_VERSION} already published to npm, skipping"
           else
             npm publish --provenance --access public
           fi
@@ -126,12 +126,12 @@ jobs:
             rm -rf compile-out && mkdir -p compile-out
             case "$target" in
               windows-*)
-                bun build src/bin.ts --compile --minify --target="bun-${target}" --outfile "compile-out/scalargalaxy.exe"
-                (cd compile-out && zip -q "$ROOT/release-binaries/scalargalaxy-${target}.zip" "scalargalaxy.exe")
+                bun build src/bin.ts --compile --minify --target="bun-${target}" --outfile "compile-out/galaxy.exe"
+                (cd compile-out && zip -q "$ROOT/release-binaries/galaxy-${target}.zip" "galaxy.exe")
                 ;;
               *)
-                bun build src/bin.ts --compile --minify --target="bun-${target}" --outfile "compile-out/scalargalaxy"
-                tar -czf "release-binaries/scalargalaxy-${target}.tar.gz" -C compile-out "scalargalaxy"
+                bun build src/bin.ts --compile --minify --target="bun-${target}" --outfile "compile-out/galaxy"
+                tar -czf "release-binaries/galaxy-${target}.tar.gz" -C compile-out "galaxy"
                 ;;
             esac
           done
@@ -160,8 +160,8 @@ jobs:
           # The formula file is lowercase even when the command it installs is not: Homebrew resolves
           # `brew install <owner>/<tap>/<name>` to `Formula/<name>.rb`, and that lookup is case-sensitive
           # on Linux. The `bin.install` below still installs the command under its own spelling.
-          cat > "tap/Formula/scalargalaxy.rb" <<'EOF'
-          class Scalargalaxy < Formula
+          cat > "tap/Formula/galaxy.rb" <<'EOF'
+          class Galaxy < Formula
             desc "The Scalar Galaxy CLI Interface"
             homepage "https://scalar.com"
             version "__VERSION__"
@@ -189,19 +189,19 @@ jobs:
             end
 
             def install
-              bin.install "scalargalaxy"
+              bin.install "galaxy"
             end
 
             test do
-              system "#{bin}/scalargalaxy", "--help"
+              system "#{bin}/galaxy", "--help"
             end
           end
           EOF
-          FORMULA="tap/Formula/scalargalaxy.rb"
+          FORMULA="tap/Formula/galaxy.rb"
           # Homebrew resolves one url/sha256 pair per platform at install time, but the formula is a
           # single file, so every platform the tap supports has to be pinned on every release.
           for target in linux-x64 linux-arm64 darwin-x64 darwin-arm64; do
-            ASSET="scalargalaxy-${target}.tar.gz"
+            ASSET="galaxy-${target}.tar.gz"
             curl -fsSL "$BASE_URL/$ASSET" -o "$ASSET"
             SHA256="$(shasum -a 256 "$ASSET" | cut -d" " -f1)"
             # `darwin-arm64` names the `__URL_DARWIN_ARM64__`/`__SHA_DARWIN_ARM64__` placeholder
@@ -214,6 +214,6 @@ jobs:
           cd tap
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add "Formula/scalargalaxy.rb"
-          git commit -m "scalargalaxy ${PKG_VERSION}" || { echo "formula unchanged, skipping"; exit 0; }
+          git add "Formula/galaxy.rb"
+          git commit -m "galaxy ${PKG_VERSION}" || { echo "formula unchanged, skipping"; exit 0; }
           git push

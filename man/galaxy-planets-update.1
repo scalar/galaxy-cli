@@ -1,19 +1,83 @@
 .\" File generated from our OpenAPI spec by Scalar. Do not edit.
-.TH "SCALARGALAXY\-AUTHENTICATION\-CREATE\-TOKEN" "1" "" "scalargalaxy" "Scalar Galaxy Manual"
+.TH "GALAXY\-PLANETS\-UPDATE" "1" "" "galaxy" "Scalar Galaxy Manual"
 .SH "NAME"
-scalargalaxy\-authentication\-create\-token \- Get a token
+galaxy\-planets\-update \- Update a planet
 .SH "SYNOPSIS"
-.B scalargalaxy authentication create\-token
-\fB\-\-email\fR \fI<value>\fR \fB\-\-password\fR \fI<value>\fR [\fIoptions\fR]
+.B galaxy planets update
+\fIplanet\-id\fR \fB\-\-name\fR \fI<value>\fR [\fIoptions\fR]
 .SH "DESCRIPTION"
-Yeah, this is the boring security stuff. Just get your super secret token and move on.
+Sometimes you make mistakes, that's fine. No worries, you can update all planets.
+.SH "ARGUMENTS"
+.TP
+\fIplanet\-id\fR, \fB\-\-planet\-id\fR \fI<value>\fR
+The ID of the planet to get. Required. Can also be supplied as \-\-planet\-id.
 .SH "OPTIONS"
 .TP
-\fB\-\-email\fR \fI<value>\fR
-The email body parameter. Required.
+\fB\-\-name\fR \fI<value>\fR
+The name body parameter. Required.
 .TP
-\fB\-\-password\fR \fI<value>\fR
-The password body parameter. Required.
+\fB\-\-description\fR \fI<value>\fR
+The description body parameter.
+.TP
+\fB\-\-type\fR \fI<value>\fR
+The type body parameter.
+.TP
+\fB\-\-habitability\-index\fR \fI<number>\fR
+A score from 0 to 1 indicating potential habitability.
+.TP
+\fB\-\-physical\-properties\fR \fI<json>\fR
+The physical\-properties body parameter.
+.TP
+\fB\-\-physical\-properties.mass\fR \fI<number>\fR
+Mass in Earth masses (must be greater than 0).
+.TP
+\fB\-\-physical\-properties.radius\fR \fI<number>\fR
+Radius in Earth radii (must be greater than 0).
+.TP
+\fB\-\-physical\-properties.gravity\fR \fI<number>\fR
+Surface gravity in Earth g.
+.TP
+\fB\-\-physical\-properties.temperature\fR \fI<json>\fR
+The physical\-properties.temperature body parameter.
+.TP
+\fB\-\-physical\-properties.temperature.min\fR \fI<number>\fR
+Minimum temperature in Kelvin.
+.TP
+\fB\-\-physical\-properties.temperature.max\fR \fI<number>\fR
+Maximum temperature in Kelvin.
+.TP
+\fB\-\-physical\-properties.temperature.average\fR \fI<number>\fR
+Average temperature in Kelvin.
+.TP
+\fB\-\-atmosphere\fR \fI<value>\fR
+Atmospheric composition. Repeat the flag to pass multiple values.
+.TP
+\fB\-\-discovered\-at\fR \fI<value>\fR
+The discovered\-at body parameter.
+.TP
+\fB\-\-image\fR \fI<value>\fR
+The image body parameter.
+.TP
+\fB\-\-satellite\fR \fI<value>\fR
+The satellite body parameter. Repeat the flag to pass multiple values.
+.TP
+\fB\-\-creator\fR \fI<json>\fR
+A user.
+.TP
+\fB\-\-creator.id\fR \fI<number>\fR
+The creator.id body parameter.
+.TP
+\fB\-\-creator.name\fR \fI<value>\fR
+The creator.name body parameter.
+.TP
+\fB\-\-tag\fR \fI<value>\fR
+The tag body parameter. Repeat the flag to pass multiple values.
+.TP
+\fB\-\-success\-callback\-url\fR \fI<value>\fR
+URL which gets invoked upon a successful operation.
+.TP
+\fB\-\-failure\-callback\-url\fR \fI<value>\fR
+URL which gets invoked upon a failed operation.
 .TP
 \fB\-\-base\-url\fR \fI<url>\fR
 Override the base URL for API requests.
@@ -69,7 +133,7 @@ OpenID Connect Authentication. Can also be set with the SCALAR_OPEN_ID_CONNECT e
 .PP
 .RS 4
 .nf
-scalargalaxy authentication create\-token \-\-bearer\-auth "$BEARER_AUTH" \-\-email 'marc@scalar.com' \-\-password 'i\-love\-scalar'
+galaxy planets update '1' \-\-bearer\-auth "$BEARER_AUTH" \-\-name 'Mars'
 .fi
 .RE
 .SH "ENVIRONMENT"
@@ -126,4 +190,4 @@ The API failed to handle the request (HTTP 5xx). Reported as server\-error.
 \fB15\fR
 The API could not be reached, or the request timed out. Reported as connection\-error.
 .SH "SEE ALSO"
-.BR scalargalaxy (1)
+.BR galaxy (1)

@@ -1,15 +1,79 @@
 .\" File generated from our OpenAPI spec by Scalar. Do not edit.
-.TH "SCALARGALAXY" "1" "" "scalargalaxy" "Scalar Galaxy Manual"
+.TH "GALAXY\-PLANETS\-CREATE" "1" "" "galaxy" "Scalar Galaxy Manual"
 .SH "NAME"
-scalargalaxy \- command line interface for the Scalar Galaxy REST API
+galaxy\-planets\-create \- Create a planet
 .SH "SYNOPSIS"
-.B scalargalaxy
-[\fIglobal options\fR] \fIcommand\fR [\fIsubcommand\fR] [\fIarguments\fR] [\fIoptions\fR]
+.B galaxy planets create
+\fB\-\-name\fR \fI<value>\fR [\fIoptions\fR]
 .SH "DESCRIPTION"
-scalargalaxy calls the Scalar Galaxy REST API from the command line. Commands are grouped by resource, and every command prints its result to standard output in the configured format.
-.PP
-The Scalar Galaxy is an example OpenAPI document to test OpenAPI tools and libraries. It's a fictional universe with fictional planets and fictional data.
-.SH "GLOBAL OPTIONS"
+Time to play god and create a new planet. What do you think? Ah, don't think too much. What could go wrong anyway?
+.SH "OPTIONS"
+.TP
+\fB\-\-name\fR \fI<value>\fR
+The name body parameter. Required.
+.TP
+\fB\-\-description\fR \fI<value>\fR
+The description body parameter.
+.TP
+\fB\-\-type\fR \fI<value>\fR
+The type body parameter.
+.TP
+\fB\-\-habitability\-index\fR \fI<number>\fR
+A score from 0 to 1 indicating potential habitability.
+.TP
+\fB\-\-physical\-properties\fR \fI<json>\fR
+The physical\-properties body parameter.
+.TP
+\fB\-\-physical\-properties.mass\fR \fI<number>\fR
+Mass in Earth masses (must be greater than 0).
+.TP
+\fB\-\-physical\-properties.radius\fR \fI<number>\fR
+Radius in Earth radii (must be greater than 0).
+.TP
+\fB\-\-physical\-properties.gravity\fR \fI<number>\fR
+Surface gravity in Earth g.
+.TP
+\fB\-\-physical\-properties.temperature\fR \fI<json>\fR
+The physical\-properties.temperature body parameter.
+.TP
+\fB\-\-physical\-properties.temperature.min\fR \fI<number>\fR
+Minimum temperature in Kelvin.
+.TP
+\fB\-\-physical\-properties.temperature.max\fR \fI<number>\fR
+Maximum temperature in Kelvin.
+.TP
+\fB\-\-physical\-properties.temperature.average\fR \fI<number>\fR
+Average temperature in Kelvin.
+.TP
+\fB\-\-atmosphere\fR \fI<value>\fR
+Atmospheric composition. Repeat the flag to pass multiple values.
+.TP
+\fB\-\-discovered\-at\fR \fI<value>\fR
+The discovered\-at body parameter.
+.TP
+\fB\-\-image\fR \fI<value>\fR
+The image body parameter.
+.TP
+\fB\-\-satellite\fR \fI<value>\fR
+The satellite body parameter. Repeat the flag to pass multiple values.
+.TP
+\fB\-\-creator\fR \fI<json>\fR
+A user.
+.TP
+\fB\-\-creator.id\fR \fI<number>\fR
+The creator.id body parameter.
+.TP
+\fB\-\-creator.name\fR \fI<value>\fR
+The creator.name body parameter.
+.TP
+\fB\-\-tag\fR \fI<value>\fR
+The tag body parameter. Repeat the flag to pass multiple values.
+.TP
+\fB\-\-success\-callback\-url\fR \fI<value>\fR
+URL which gets invoked upon a successful operation.
+.TP
+\fB\-\-failure\-callback\-url\fR \fI<value>\fR
+URL which gets invoked upon a failed operation.
 .TP
 \fB\-\-base\-url\fR \fI<url>\fR
 Override the base URL for API requests.
@@ -61,48 +125,11 @@ OAuth 2.0 authentication. Can also be set with the SCALAR_O_AUTH2 environment va
 .TP
 \fB\-\-open\-id\-connect\fR \fI<value>\fR
 OpenID Connect Authentication. Can also be set with the SCALAR_OPEN_ID_CONNECT environment variable.
-.SH "COMMANDS"
-.TP
-\fBscalargalaxy planets list\-all\-data\fR
-Get all planets. See scalargalaxy\-planets\-list\-all\-data(1).
-.TP
-\fBscalargalaxy planets create\fR
-Create a planet. See scalargalaxy\-planets\-create(1).
-.TP
-\fBscalargalaxy planets retrieve\fR
-Get a planet. See scalargalaxy\-planets\-retrieve(1).
-.TP
-\fBscalargalaxy planets update\fR
-Update a planet. See scalargalaxy\-planets\-update(1).
-.TP
-\fBscalargalaxy planets delete\fR
-Delete a planet. See scalargalaxy\-planets\-delete(1).
-.TP
-\fBscalargalaxy planets delte\-image\fR
-Upload an image to a planet. See scalargalaxy\-planets\-delte\-image(1).
-.TP
-\fBscalargalaxy celestial\-bodies create\fR
-Create a celestial body. See scalargalaxy\-celestial\-bodies\-create(1).
-.TP
-\fBscalargalaxy authentication create\-user\fR
-Create a user. See scalargalaxy\-authentication\-create\-user(1).
-.TP
-\fBscalargalaxy authentication create\-token\fR
-Get a token. See scalargalaxy\-authentication\-create\-token(1).
-.TP
-\fBscalargalaxy authentication list\-me\fR
-Get authenticated user. See scalargalaxy\-authentication\-list\-me(1).
-.TP
-\fBscalargalaxy completion\fR
-Print a shell completion script. See scalargalaxy\-completion(1).
-.SH "SHELL COMPLETION"
-scalargalaxy completion <shell> prints a completion script for bash, zsh, and fish. Load it from your shell startup file:
+.SH "EXAMPLES"
 .PP
 .RS 4
 .nf
-eval "$(scalargalaxy completion bash)"
-eval "$(scalargalaxy completion zsh)"
-scalargalaxy completion fish | source
+galaxy planets create \-\-bearer\-auth "$BEARER_AUTH" \-\-name 'Mars'
 .fi
 .RE
 .SH "ENVIRONMENT"
@@ -158,3 +185,5 @@ The API failed to handle the request (HTTP 5xx). Reported as server\-error.
 .TP
 \fB15\fR
 The API could not be reached, or the request timed out. Reported as connection\-error.
+.SH "SEE ALSO"
+.BR galaxy (1)

@@ -27,17 +27,17 @@ The full API of this library can be found in [api.md](./api.md).
 
 ```sh
 # npm (requires Node.js)
-npm install -g scalargalaxy-cli
+npm install -g @scalar/galaxy-cli
 
 # Homebrew — standalone binary, no Node.js required
-brew install scalar/galaxy-cli-tap/scalargalaxy
+brew install scalar/galaxy-cli-tap/galaxy
 
 # Direct download — standalone binary, no Node.js required
-curl -fsSL https://github.com/scalar/galaxy-cli/releases/latest/download/scalargalaxy-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m | sed 's/x86_64/x64/;s/aarch64/arm64/').tar.gz | tar xz
-sudo mv scalargalaxy /usr/local/bin/
+curl -fsSL https://github.com/scalar/galaxy-cli/releases/latest/download/galaxy-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m | sed 's/x86_64/x64/;s/aarch64/arm64/').tar.gz | tar xz
+sudo mv galaxy /usr/local/bin/
 
-# Windows — download and extract scalargalaxy-windows-x64.zip, then add it to PATH
-# https://github.com/scalar/galaxy-cli/releases/latest/download/scalargalaxy-windows-x64.zip
+# Windows — download and extract galaxy-windows-x64.zip, then add it to PATH
+# https://github.com/scalar/galaxy-cli/releases/latest/download/galaxy-windows-x64.zip
 ```
 
 <br />
@@ -45,9 +45,9 @@ sudo mv scalargalaxy /usr/local/bin/
 ## Usage
 
 ```sh
-scalargalaxy [resource] [command] [flags]
+galaxy [resource] [command] [flags]
 
-scalargalaxy planets list-all-data --bearer-auth "$BEARER_AUTH" --limit '10' --offset '0'
+galaxy planets list-all-data --bearer-auth "$BEARER_AUTH" --limit '10' --offset '0'
 ```
 
 The examples in the following sections assume a `client` configured as shown above.
@@ -58,28 +58,28 @@ See the [API reference](./api.md) for every available operation.
 
 ## Shell Completion
 
-`scalargalaxy completion <shell>` prints a completion script for bash, zsh, and fish. Add the matching line to your shell startup file to complete commands, subcommands, and flags with Tab.
+`galaxy completion <shell>` prints a completion script for bash, zsh, and fish. Add the matching line to your shell startup file to complete commands, subcommands, and flags with Tab.
 
 ```sh
 # bash (~/.bashrc)
-eval "$(scalargalaxy completion bash)"
+eval "$(galaxy completion bash)"
 
 # zsh (~/.zshrc)
-eval "$(scalargalaxy completion zsh)"
+eval "$(galaxy completion zsh)"
 
 # fish (~/.config/fish/config.fish)
-scalargalaxy completion fish | source
+galaxy completion fish | source
 ```
 
 <br />
 
 ## Manual Pages
 
-Installing the package globally also installs man pages. `man scalargalaxy` lists every command, and each command has its own page named after the command with spaces and `:` replaced by `-`.
+Installing the package globally also installs man pages. `man galaxy` lists every command, and each command has its own page named after the command with spaces and `:` replaced by `-`.
 
 ```sh
-man scalargalaxy
-man scalargalaxy-<resource>-<command>
+man galaxy
+man galaxy-<resource>-<command>
 ```
 
 <br />

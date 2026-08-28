@@ -1,11 +1,11 @@
 {
-  "name": "scalargalaxy-cli",
+  "name": "@scalar/galaxy-cli",
   "version": "0.1.0",
   "description": "The Scalar Galaxy is an example OpenAPI document to test OpenAPI tools and libraries. It's a fictional universe with fictional planets and fictional data.",
   "author": "Scalar Galaxy",
   "type": "module",
   "bin": {
-    "scalargalaxy": "./dist/esm/bin.js"
+    "galaxy": "./dist/esm/bin.js"
   },
   "main": "./dist/cjs/index.js",
   "module": "./dist/esm/index.js",
@@ -26,18 +26,18 @@
     "SKILL.md"
   ],
   "man": [
-    "./man/scalargalaxy.1",
-    "./man/scalargalaxy-planets-list-all-data.1",
-    "./man/scalargalaxy-planets-create.1",
-    "./man/scalargalaxy-planets-retrieve.1",
-    "./man/scalargalaxy-planets-update.1",
-    "./man/scalargalaxy-planets-delete.1",
-    "./man/scalargalaxy-planets-delte-image.1",
-    "./man/scalargalaxy-celestial-bodies-create.1",
-    "./man/scalargalaxy-authentication-create-user.1",
-    "./man/scalargalaxy-authentication-create-token.1",
-    "./man/scalargalaxy-authentication-list-me.1",
-    "./man/scalargalaxy-completion.1"
+    "./man/galaxy.1",
+    "./man/galaxy-planets-list-all-data.1",
+    "./man/galaxy-planets-create.1",
+    "./man/galaxy-planets-retrieve.1",
+    "./man/galaxy-planets-update.1",
+    "./man/galaxy-planets-delete.1",
+    "./man/galaxy-planets-delte-image.1",
+    "./man/galaxy-celestial-bodies-create.1",
+    "./man/galaxy-authentication-create-user.1",
+    "./man/galaxy-authentication-create-token.1",
+    "./man/galaxy-authentication-list-me.1",
+    "./man/galaxy-completion.1"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json && tsc -p tsconfig.cjs.json && node scripts/finalize-build.mjs",
