@@ -1,6 +1,6 @@
 {
   "name": "scalargalaxy-cli",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "The Scalar Galaxy is an example OpenAPI document to test OpenAPI tools and libraries. It's a fictional universe with fictional planets and fictional data.",
   "author": "Scalar Galaxy",
   "type": "module",
