@@ -55,7 +55,7 @@ export type AuthTokenProvider = () => string | Promise<string>;
 
 const environments = {
   production: 'https://galaxy.scalar.com',
-  responds_with_your_request_data: '{protocol}://void.scalar.com/{path}',
+  void: 'https://void.scalar.com/',
 };
 type Environment = keyof typeof environments;
 
@@ -110,7 +110,7 @@ export interface ClientOptions {
    *
    * Each environment maps to a different base URL:
    * - `production` corresponds to `https://galaxy.scalar.com`
-   * - `responds_with_your_request_data` corresponds to `{protocol}://void.scalar.com/{path}`
+   * - `void` corresponds to `https://void.scalar.com/`
    */
   environment?: Environment | undefined;
 
