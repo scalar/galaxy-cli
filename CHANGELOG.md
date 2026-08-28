@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.2](https://github.com/scalar/galaxy-cli/compare/v0.2.1...v0.2.2) (2026-08-28)
+
+
+### Chores
+
+* **api:** update generated SDK content ([992a1b6](https://github.com/scalar/galaxy-cli/commit/992a1b68d563ab3d8d48507b095ae91ddb563d2c))
+
 ## [0.2.1](https://github.com/scalar/galaxy-cli/compare/v0.2.0...v0.2.1) (2026-08-28)
 
 
