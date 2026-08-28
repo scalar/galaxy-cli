@@ -10,9 +10,18 @@ Generated CLI client for Scalar Galaxy API, published as `scalargalaxy-cli`. Use
 ## Install
 
 ```sh
+# npm (requires Node.js)
+npm install -g scalargalaxy-cli
+
 # Homebrew — standalone binary, no Node.js required
-brew tap scalar/galaxy-cl https://github.com/scalar/galaxy-cl
-brew install scalargalaxy
+brew install scalar/galaxy-cli-tap/scalargalaxy
+
+# Direct download — standalone binary, no Node.js required
+curl -fsSL https://github.com/scalar/galaxy-cli/releases/latest/download/scalargalaxy-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m | sed 's/x86_64/x64/;s/aarch64/arm64/').tar.gz | tar xz
+sudo mv scalargalaxy /usr/local/bin/
+
+# Windows — download and extract scalargalaxy-windows-x64.zip, then add it to PATH
+# https://github.com/scalar/galaxy-cli/releases/latest/download/scalargalaxy-windows-x64.zip
 ```
 
 ## Client setup and authentication
@@ -52,7 +61,7 @@ Failed requests print a structured error to standard error and exit with a statu
 
 ## Requirements
 
-- None — the standalone binaries bundle their own runtime.
+- Node.js 20 or newer — for the npm install only; the standalone binaries bundle their own runtime.
 
 ## Reference files
 

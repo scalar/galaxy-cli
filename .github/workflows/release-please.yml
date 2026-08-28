@@ -85,12 +85,23 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "24"
+          registry-url: "https://registry.npmjs.org"
       - run: npm install
       - run: npm run build
       # The version is owned by release tooling in this repository, never by the SDK generator,
       # so every release step reads it from package.json at run time.
       - name: Read package version
         run: echo "PKG_VERSION=$(node -p 'require("./package.json").version')" >> "$GITHUB_ENV"
+      # OIDC trusted publishing needs npm >= 11.5; pinned to the major (not `latest`) so a new
+      # npm major raising its Node engine floor cannot break publishes against the pinned Node.
+      - run: npm install -g npm@11
+      - name: Publish to npm
+        run: |
+          if npm view "scalargalaxy-cli@${PKG_VERSION}" version >/dev/null 2>&1; then
+            echo "scalargalaxy-cli@${PKG_VERSION} already published to npm, skipping"
+          else
+            npm publish --provenance --access public
+          fi
       - name: Set up Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
@@ -111,7 +122,7 @@ jobs:
         run: |
           ROOT="$PWD"
           mkdir -p release-binaries
-          for target in linux-x64 linux-arm64 darwin-x64 darwin-arm64; do
+          for target in linux-x64 linux-arm64 darwin-x64 darwin-arm64 windows-x64; do
             rm -rf compile-out && mkdir -p compile-out
             case "$target" in
               windows-*)
@@ -140,7 +151,7 @@ jobs:
           # two disagree — a renamed, transferred, or forked destination repo then 404s here on
           # every release, having uploaded the archives perfectly well one step earlier.
           BASE_URL="https://github.com/${{ github.repository }}/releases/download/v${PKG_VERSION}"
-          git clone "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/scalar/galaxy-cl.git" tap
+          git clone "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/scalar/homebrew-galaxy-cli-tap.git" tap
           mkdir -p tap/Formula
           # Each archive holds a single `bun build --compile` executable with the Bun runtime and
           # every dependency embedded, so the formula declares no `depends_on` and installs the
