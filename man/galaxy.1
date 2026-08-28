@@ -1,22 +1,15 @@
 .\" File generated from our OpenAPI spec by Scalar. Do not edit.
-.TH "SCALARGALAXY\-AUTHENTICATION\-CREATE\-USER" "1" "" "scalargalaxy" "Scalar Galaxy Manual"
+.TH "GALAXY" "1" "" "galaxy" "Scalar Galaxy Manual"
 .SH "NAME"
-scalargalaxy\-authentication\-create\-user \- Create a user
+galaxy \- command line interface for the Scalar Galaxy REST API
 .SH "SYNOPSIS"
-.B scalargalaxy authentication create\-user
-\fB\-\-email\fR \fI<value>\fR \fB\-\-password\fR \fI<value>\fR [\fIoptions\fR]
+.B galaxy
+[\fIglobal options\fR] \fIcommand\fR [\fIsubcommand\fR] [\fIarguments\fR] [\fIoptions\fR]
 .SH "DESCRIPTION"
-Time to create a user account, eh?
-.SH "OPTIONS"
-.TP
-\fB\-\-name\fR \fI<value>\fR
-The name body parameter.
-.TP
-\fB\-\-email\fR \fI<value>\fR
-The email body parameter. Required.
-.TP
-\fB\-\-password\fR \fI<value>\fR
-The password body parameter. Required.
+galaxy calls the Scalar Galaxy REST API from the command line. Commands are grouped by resource, and every command prints its result to standard output in the configured format.
+.PP
+The Scalar Galaxy is an example OpenAPI document to test OpenAPI tools and libraries. It's a fictional universe with fictional planets and fictional data.
+.SH "GLOBAL OPTIONS"
 .TP
 \fB\-\-base\-url\fR \fI<url>\fR
 Override the base URL for API requests.
@@ -68,11 +61,48 @@ OAuth 2.0 authentication. Can also be set with the SCALAR_O_AUTH2 environment va
 .TP
 \fB\-\-open\-id\-connect\fR \fI<value>\fR
 OpenID Connect Authentication. Can also be set with the SCALAR_OPEN_ID_CONNECT environment variable.
-.SH "EXAMPLES"
+.SH "COMMANDS"
+.TP
+\fBgalaxy planets list\-all\-data\fR
+Get all planets. See galaxy\-planets\-list\-all\-data(1).
+.TP
+\fBgalaxy planets create\fR
+Create a planet. See galaxy\-planets\-create(1).
+.TP
+\fBgalaxy planets retrieve\fR
+Get a planet. See galaxy\-planets\-retrieve(1).
+.TP
+\fBgalaxy planets update\fR
+Update a planet. See galaxy\-planets\-update(1).
+.TP
+\fBgalaxy planets delete\fR
+Delete a planet. See galaxy\-planets\-delete(1).
+.TP
+\fBgalaxy planets delte\-image\fR
+Upload an image to a planet. See galaxy\-planets\-delte\-image(1).
+.TP
+\fBgalaxy celestial\-bodies create\fR
+Create a celestial body. See galaxy\-celestial\-bodies\-create(1).
+.TP
+\fBgalaxy authentication create\-user\fR
+Create a user. See galaxy\-authentication\-create\-user(1).
+.TP
+\fBgalaxy authentication create\-token\fR
+Get a token. See galaxy\-authentication\-create\-token(1).
+.TP
+\fBgalaxy authentication list\-me\fR
+Get authenticated user. See galaxy\-authentication\-list\-me(1).
+.TP
+\fBgalaxy completion\fR
+Print a shell completion script. See galaxy\-completion(1).
+.SH "SHELL COMPLETION"
+galaxy completion <shell> prints a completion script for bash, zsh, and fish. Load it from your shell startup file:
 .PP
 .RS 4
 .nf
-scalargalaxy authentication create\-user \-\-bearer\-auth "$BEARER_AUTH" \-\-name 'Marc' \-\-email 'marc@scalar.com' \-\-password 'i\-love\-scalar'
+eval "$(galaxy completion bash)"
+eval "$(galaxy completion zsh)"
+galaxy completion fish | source
 .fi
 .RE
 .SH "ENVIRONMENT"
@@ -128,5 +158,3 @@ The API failed to handle the request (HTTP 5xx). Reported as server\-error.
 .TP
 \fB15\fR
 The API could not be reached, or the request timed out. Reported as connection\-error.
-.SH "SEE ALSO"
-.BR scalargalaxy (1)

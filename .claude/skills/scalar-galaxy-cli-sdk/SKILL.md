@@ -1,27 +1,27 @@
 ---
 name: scalar-galaxy-cli-sdk
-description: "CLI SDK for Scalar Galaxy API. Use when writing CLI code that calls Scalar Galaxy API with the scalargalaxy-cli package: installing it, constructing and authenticating the client, and calling API operations."
+description: "CLI SDK for Scalar Galaxy API. Use when writing CLI code that calls Scalar Galaxy API with the @scalar/galaxy-cli package: installing it, constructing and authenticating the client, and calling API operations."
 ---
 
 # Scalar Galaxy CLI SDK
 
-Generated CLI client for Scalar Galaxy API, published as `scalargalaxy-cli`. Use the generated client instead of hand-writing HTTP requests.
+Generated CLI client for Scalar Galaxy API, published as `@scalar/galaxy-cli`. Use the generated client instead of hand-writing HTTP requests.
 
 ## Install
 
 ```sh
 # npm (requires Node.js)
-npm install -g scalargalaxy-cli
+npm install -g @scalar/galaxy-cli
 
 # Homebrew — standalone binary, no Node.js required
-brew install scalar/galaxy-cli-tap/scalargalaxy
+brew install scalar/galaxy-cli-tap/galaxy
 
 # Direct download — standalone binary, no Node.js required
-curl -fsSL https://github.com/scalar/galaxy-cli/releases/latest/download/scalargalaxy-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m | sed 's/x86_64/x64/;s/aarch64/arm64/').tar.gz | tar xz
-sudo mv scalargalaxy /usr/local/bin/
+curl -fsSL https://github.com/scalar/galaxy-cli/releases/latest/download/galaxy-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m | sed 's/x86_64/x64/;s/aarch64/arm64/').tar.gz | tar xz
+sudo mv galaxy /usr/local/bin/
 
-# Windows — download and extract scalargalaxy-windows-x64.zip, then add it to PATH
-# https://github.com/scalar/galaxy-cli/releases/latest/download/scalargalaxy-windows-x64.zip
+# Windows — download and extract galaxy-windows-x64.zip, then add it to PATH
+# https://github.com/scalar/galaxy-cli/releases/latest/download/galaxy-windows-x64.zip
 ```
 
 ## Client setup and authentication
@@ -40,9 +40,9 @@ Provide credentials using the options below. Environment variables are read auto
 ## Calling operations
 
 ```sh
-scalargalaxy [resource] [command] [flags]
+galaxy [resource] [command] [flags]
 
-scalargalaxy planets list-all-data --bearer-auth "$BEARER_AUTH" --limit '10' --offset '0'
+galaxy planets list-all-data --bearer-auth "$BEARER_AUTH" --limit '10' --offset '0'
 ```
 
 Method names, parameter shapes, and response types are generated from the API description — do not guess them. Look up the exact call signature in [api.md](../../../api.md) before writing a call.
@@ -57,7 +57,7 @@ Failed requests print a structured error to standard error and exit with a statu
 - Use `--max-items <count>` to bound paginated, streaming, and WebSocket commands before they fill the context, and `--transform <dot.path>` to keep only the field you need.
 - Commands never prompt, so they are safe to run non-interactively. Credentials come from the documented environment variables or their flags.
 - Branch on the exit status rather than on stderr text: `0` success, `1` `error`, `2` `usage`, `10` `auth-failed`, `11` `not-found`, `12` `rate-limited`, `13` `client-error`, `14` `server-error`, `15` `connection-error`. A failed request repeats its class on stderr as a stable `code`, with a `hint` when there is a concrete next step; exit `2` is a plain message with no structured body, because the command never ran.
-- Run `scalargalaxy --help` or `scalargalaxy <resource> --help` to discover commands and flags, and `man scalargalaxy` for the full reference.
+- Run `galaxy --help` or `galaxy <resource> --help` to discover commands and flags, and `man galaxy` for the full reference.
 
 ## Requirements
 
