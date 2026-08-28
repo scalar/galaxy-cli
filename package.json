@@ -3,6 +3,10 @@
   "version": "0.2.2",
   "description": "The Scalar Galaxy is an example OpenAPI document to test OpenAPI tools and libraries. It's a fictional universe with fictional planets and fictional data.",
   "author": "Scalar Galaxy",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scalar/galaxy-cli.git"
+  },
   "type": "module",
   "bin": {
     "galaxy": "./dist/esm/bin.js"
