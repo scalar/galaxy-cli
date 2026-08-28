@@ -1,17 +1,20 @@
 .\" File generated from our OpenAPI spec by Scalar. Do not edit.
-.TH "SCALARGALAXY\-PLANETS\-RETRIEVE" "1" "" "scalargalaxy" "Scalar Galaxy Manual"
+.TH "GALAXY\-PLANETS\-DELTE\-IMAGE" "1" "" "galaxy" "Scalar Galaxy Manual"
 .SH "NAME"
-scalargalaxy\-planets\-retrieve \- Get a planet
+galaxy\-planets\-delte\-image \- Upload an image to a planet
 .SH "SYNOPSIS"
-.B scalargalaxy planets retrieve
+.B galaxy planets delte\-image
 \fIplanet\-id\fR [\fIoptions\fR]
 .SH "DESCRIPTION"
-You'll better learn a little bit more about the planets. It might come in handy once space travel is available for everyone.
+Got a crazy good photo of a planet? Share it with the world!
 .SH "ARGUMENTS"
 .TP
 \fIplanet\-id\fR, \fB\-\-planet\-id\fR \fI<value>\fR
 The ID of the planet to get. Required. Can also be supplied as \-\-planet\-id.
 .SH "OPTIONS"
+.TP
+\fB\-\-image\fR \fI<value>\fR
+The image file to upload.
 .TP
 \fB\-\-base\-url\fR \fI<url>\fR
 Override the base URL for API requests.
@@ -67,7 +70,7 @@ OpenID Connect Authentication. Can also be set with the SCALAR_OPEN_ID_CONNECT e
 .PP
 .RS 4
 .nf
-scalargalaxy planets retrieve '1' \-\-bearer\-auth "$BEARER_AUTH"
+galaxy planets delte\-image '1' \-\-bearer\-auth "$BEARER_AUTH"
 .fi
 .RE
 .SH "ENVIRONMENT"
@@ -124,4 +127,4 @@ The API failed to handle the request (HTTP 5xx). Reported as server\-error.
 \fB15\fR
 The API could not be reached, or the request timed out. Reported as connection\-error.
 .SH "SEE ALSO"
-.BR scalargalaxy (1)
+.BR galaxy (1)

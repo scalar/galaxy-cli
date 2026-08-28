@@ -1,12 +1,16 @@
 .\" File generated from our OpenAPI spec by Scalar. Do not edit.
-.TH "SCALARGALAXY\-CELESTIAL\-BODIES\-CREATE" "1" "" "scalargalaxy" "Scalar Galaxy Manual"
+.TH "GALAXY\-PLANETS\-RETRIEVE" "1" "" "galaxy" "Scalar Galaxy Manual"
 .SH "NAME"
-scalargalaxy\-celestial\-bodies\-create \- Create a celestial body
+galaxy\-planets\-retrieve \- Get a planet
 .SH "SYNOPSIS"
-.B scalargalaxy celestial\-bodies create
-[\fIoptions\fR]
+.B galaxy planets retrieve
+\fIplanet\-id\fR [\fIoptions\fR]
 .SH "DESCRIPTION"
-Stars, moons, comets, the occasional rogue asteroid — if it glows or drifts through the void, you can add it here.
+You'll better learn a little bit more about the planets. It might come in handy once space travel is available for everyone.
+.SH "ARGUMENTS"
+.TP
+\fIplanet\-id\fR, \fB\-\-planet\-id\fR \fI<value>\fR
+The ID of the planet to get. Required. Can also be supplied as \-\-planet\-id.
 .SH "OPTIONS"
 .TP
 \fB\-\-base\-url\fR \fI<url>\fR
@@ -63,7 +67,7 @@ OpenID Connect Authentication. Can also be set with the SCALAR_OPEN_ID_CONNECT e
 .PP
 .RS 4
 .nf
-scalargalaxy celestial\-bodies create \-\-bearer\-auth "$BEARER_AUTH"
+galaxy planets retrieve '1' \-\-bearer\-auth "$BEARER_AUTH"
 .fi
 .RE
 .SH "ENVIRONMENT"
@@ -120,4 +124,4 @@ The API failed to handle the request (HTTP 5xx). Reported as server\-error.
 \fB15\fR
 The API could not be reached, or the request timed out. Reported as connection\-error.
 .SH "SEE ALSO"
-.BR scalargalaxy (1)
+.BR galaxy (1)
