@@ -1,0 +1,9 @@
+node_modules/
+/dist/
+*.tsbuildinfo
+.env
+.env.*
+/*.tar.gz
+/compile-out/
+/release-binaries/
+/tap/
