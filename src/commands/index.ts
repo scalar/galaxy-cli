@@ -723,7 +723,7 @@ export const getProgram = (): Command =>
   createProgram({
     SDK,
     binaryName: 'galaxy',
-    version: '0.2.4', // x-release-please-version
+    version: '0.3.0', // x-release-please-version
     description: 'CLI for Scalar Galaxy',
     defaultFormat: 'auto',
     defaultErrorFormat: 'auto',
