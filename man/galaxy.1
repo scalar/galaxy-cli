@@ -95,6 +95,17 @@ Get authenticated user. See galaxy\-authentication\-list\-me(1).
 .TP
 \fBgalaxy completion\fR
 Print a shell completion script. See galaxy\-completion(1).
+.SH "FILE ARGUMENTS"
+Any command flag or credential reads its value from a file when the value begins with @. A flag shown with a <path> value uploads a file and takes its path with or without the @. The global options above are read exactly as written.
+.PP
+.RS 4
+.nf
+galaxy COMMAND \-\-FLAG @./body.json    # contents of the file
+galaxy COMMAND \-\-FLAG @file://./n.txt # always sent as text
+galaxy COMMAND \-\-FLAG @data://./l.png # always base64\-encoded
+galaxy COMMAND \-\-FLAG '\e@literal'    # a value that begins with @
+.fi
+.RE
 .SH "SHELL COMPLETION"
 galaxy completion <shell> prints a completion script for bash, zsh, and fish. Load it from your shell startup file:
 .PP

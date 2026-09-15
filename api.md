@@ -91,7 +91,11 @@ Some endpoints are public, but some require authentication. We provide all the r
 Time to create a user account, eh?
 
 ```sh
-galaxy authentication create-user --bearer-auth "$BEARER_AUTH" --name 'Marc' --email 'marc@scalar.com' --password 'i-love-scalar'
+galaxy authentication create-user \
+  --bearer-auth "$BEARER_AUTH" \
+  --name 'Marc' \
+  --email 'marc@scalar.com' \
+  --password 'i-love-scalar'
 ```
 
 ### Get a token
@@ -99,7 +103,10 @@ galaxy authentication create-user --bearer-auth "$BEARER_AUTH" --name 'Marc' --e
 Yeah, this is the boring security stuff. Just get your super secret token and move on.
 
 ```sh
-galaxy authentication create-token --bearer-auth "$BEARER_AUTH" --email 'marc@scalar.com' --password 'i-love-scalar'
+galaxy authentication create-token \
+  --bearer-auth "$BEARER_AUTH" \
+  --email 'marc@scalar.com' \
+  --password 'i-love-scalar'
 ```
 
 ### Get authenticated user

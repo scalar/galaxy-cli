@@ -12,7 +12,8 @@
 //   - SCALAR_SMOKE_REPORT: a file path; when set, the run writes a JSON report there instead of
 //     printing a table. The generator uses this to collect per-operation results.
 import { execFile } from 'node:child_process';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
@@ -80,7 +81,7 @@ const cases: { operation: string; method: string; path: string; label?: string; 
       '--creator',
       '{"name":"Marc"}',
       '--tag',
-      'tag',
+      '',
       '--success-callback-url',
       'https://example.com/webhook',
       '--failure-callback-url',
@@ -133,7 +134,7 @@ const cases: { operation: string; method: string; path: string; label?: string; 
       '--creator',
       '{"name":"Marc"}',
       '--tag',
-      'tag',
+      '',
       '--success-callback-url',
       'https://example.com/webhook',
       '--failure-callback-url',
@@ -161,7 +162,7 @@ const cases: { operation: string; method: string; path: string; label?: string; 
     method: 'POST',
     path: '/planets/{planetId}/image',
     label: 'all params',
-    args: ['planets', 'delte-image', '1', '--image', '@mars.jpg'],
+    args: ['planets', 'delte-image', '1', '--image', '__scalar_smoke_file__'],
   },
 
   {
@@ -229,8 +230,32 @@ const resolveBinPath = (): string => {
   );
 };
 
+// A `file` flag is a path the CLI opens, so its argv token is a placeholder rather than a sampled
+// value — nothing the schema could produce names a real file. One temporary file backs every such
+// flag in the run: the commands only need the path to resolve and the bytes to arrive.
+const createSmokeFile = (): string => {
+  const dir = mkdtempSync(join(tmpdir(), 'scalar-cli-smoke-'));
+  const path = join(dir, 'smoke-upload.txt');
+  writeFileSync(path, 'scalar smoke test upload\n', 'utf8');
+  return path;
+};
+
+/**
+ * How many commands run at once, capped at the number of cases there are.
+ *
+ * SCALAR_SMOKE_CONCURRENCY overrides the default; anything unparseable falls back to it.
+ */
+const smokeConcurrency = (caseCount: number): number => {
+  const override = Number.parseInt(process.env['SCALAR_SMOKE_CONCURRENCY'] ?? '', 10);
+  const limit = Number.isInteger(override) && override > 0 ? override : 32;
+  return Math.min(limit, caseCount);
+};
+
 const main = async (): Promise<void> => {
   const binPath = resolveBinPath();
+  const smokeFilePath = cases.some((testCase) => testCase.args.includes('__scalar_smoke_file__'))
+    ? createSmokeFile()
+    : undefined;
 
   // SCALAR_SMOKE_FILTER (comma-separated) keeps only cases whose operation name or path matches
   // one of the needles, so a caller can smoke-test a subset. With no filter, every case runs.
@@ -248,10 +273,18 @@ const main = async (): Promise<void> => {
         )
       : cases;
 
-  // Run every selected command concurrently. Promise.allSettled means one failing command never
-  // blocks the others, so a single run reports the status of every endpoint.
-  const settled = await Promise.allSettled(
-    selected.map(async (testCase): Promise<SmokeResult> => {
+  // Run the selected commands under a bounded worker pool rather than all at once. Every case
+  // spawns a whole node process running the built binary, so an unbounded fan-out over a large
+  // SDK's command surface would swamp the machine. Each worker pulls the next index off a shared
+  // cursor and writes into a pre-sized array, so results stay in case order however the workers
+  // interleave. The per-case body catches everything and never rejects, so one failing command
+  // still cannot block the others.
+  const results: SmokeResult[] = new Array<SmokeResult>(selected.length);
+  let cursor = 0;
+  const runNext = async (): Promise<void> => {
+    for (let index = cursor++; index < selected.length; index = cursor++) {
+      const testCase = selected[index];
+      if (!testCase) continue;
       const startedAt = Date.now();
       // `label` distinguishes the required-flags run from the all-flags run of the same command;
       // it is omitted entirely when the command contributed only one case.
@@ -264,12 +297,15 @@ const main = async (): Promise<void> => {
       try {
         // Pass the current environment through so the embedded SDK picks up the base URL and
         // credentials; node runs the built bin exactly as the published executable would.
-        await execFileAsync('node', [binPath, ...testCase.args], {
+        const args = testCase.args.map((arg) =>
+          arg === '__scalar_smoke_file__' && smokeFilePath ? smokeFilePath : arg,
+        );
+        await execFileAsync('node', [binPath, ...args], {
           env: process.env,
           timeout: COMMAND_TIMEOUT_MS,
           maxBuffer: 1024 * 1024 * 20,
         });
-        return { ...identity, status: 'passed', durationMs: Date.now() - startedAt };
+        results[index] = { ...identity, status: 'passed', durationMs: Date.now() - startedAt };
       } catch (error) {
         // Surface stderr (commander/runtime error output) when present; fall back to the message.
         const detail =
@@ -278,24 +314,16 @@ const main = async (): Promise<void> => {
             : '';
         const message =
           detail.trim() || (error instanceof Error ? (error.stack ?? error.message) : String(error));
-        return { ...identity, status: 'failed', durationMs: Date.now() - startedAt, error: message };
-      }
-    }),
-  );
-
-  // allSettled never rejects, but defensively map any rejected slot to a failed result.
-  const results: SmokeResult[] = settled.map((result) =>
-    result.status === 'fulfilled'
-      ? result.value
-      : {
-          operation: 'unknown',
-          method: '',
-          path: '',
+        results[index] = {
+          ...identity,
           status: 'failed',
-          durationMs: 0,
-          error: String(result.reason),
-        },
-  );
+          durationMs: Date.now() - startedAt,
+          error: message,
+        };
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: smokeConcurrency(selected.length) }, runNext));
   const failed = results.filter((result) => result.status === 'failed');
 
   // With SCALAR_SMOKE_REPORT set, write a machine-readable report; otherwise print a table.
