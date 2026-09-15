@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.3.0](https://github.com/scalar/galaxy-cli/compare/v0.2.4...v0.3.0) (2026-09-15)
+
+
+### ⚠ BREAKING CHANGES
+
+* **api:** 3 breaking changes to the SDK surface.
+    - Property `planet.habitabilityIndex` type changed from `number<float>` to `number<float>`.
+    - Property `planet.physicalProperties` type changed from `object` to `object`.
+    - Property `planet.atmosphere` type changed from `Array<object>` to `Array<object>`.
+
+### Features
+
+* **api:** update property planet.habitabilityIndex (+3 more changes) ([8f747ec](https://github.com/scalar/galaxy-cli/commit/8f747ec8cf5731f5f9216522c320315c5522de52))
+
+
+### Chores
+
+* **api:** update generated SDK content ([e67dec8](https://github.com/scalar/galaxy-cli/commit/e67dec80245f06d59127065f339e7ba37e0a61b9))
+
 ## [0.2.4](https://github.com/scalar/galaxy-cli/compare/v0.2.3...v0.2.4) (2026-09-01)
 
 
