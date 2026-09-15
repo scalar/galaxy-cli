@@ -11,6 +11,7 @@ The full API of this library can be found in [api.md](./api.md).
 - [Installation](#installation)
 - [Usage](#usage)
 - [API Reference](./api.md)
+- [File Arguments](#file-arguments)
 - [Shell Completion](#shell-completion)
 - [Manual Pages](#manual-pages)
 - [Authentication](#authentication)
@@ -53,6 +54,19 @@ galaxy planets list-all-data --bearer-auth "$BEARER_AUTH" --limit '10' --offset 
 The examples in the following sections assume a `client` configured as shown above.
 
 See the [API reference](./api.md) for every available operation.
+
+<br />
+
+## File Arguments
+
+Any command flag or credential reads its value from a file when the value begins with `@`, so a body field holding a whole document does not have to survive shell quoting. `@file://` always sends the file as text and `@data://` always sends it base64-encoded; a bare `@` lets the file decide. A flag that uploads a file takes its path with or without the `@`. Escape a literal value that begins with `@` as `\@`. The global options (`--base-url`, `--timeout`, `--format` and the rest) are read exactly as written.
+
+```sh
+galaxy COMMAND --FLAG @./body.json
+galaxy COMMAND --FLAG @file://./notes.txt
+galaxy COMMAND --FLAG @data://./logo.png
+galaxy COMMAND --FLAG '\@not-a-file'
+```
 
 <br />
 

@@ -71,11 +71,13 @@ export namespace NewPlanetWebhookEvent {
     /**
      * Mass in Earth masses (must be greater than 0)
      * @format float
+     * @exclusiveMinimum 0
      */
     mass?: number;
     /**
      * Radius in Earth radii (must be greater than 0)
      * @format float
+     * @exclusiveMinimum 0
      */
     radius?: number;
     /**
@@ -110,6 +112,7 @@ export namespace NewPlanetWebhookEvent {
     compound?: string;
     /**
      * @format float
+     * @exclusiveMaximum 100
      */
     percentage?: number;
   }
