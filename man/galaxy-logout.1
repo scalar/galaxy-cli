@@ -1,0 +1,31 @@
+.\" File generated from our OpenAPI spec by Scalar. Do not edit.
+.TH "GALAXY\-LOGOUT" "1" "" "galaxy" "Scalar Galaxy Manual"
+.SH "NAME"
+galaxy\-logout \- forget saved credentials
+.SH "SYNOPSIS"
+.B galaxy logout
+[\fB\-\-all\fR] [\fB\-\-base\-url\fR \fIurl\fR] [\fB\-\-environment\fR \fIname\fR]
+.SH "DESCRIPTION"
+Removes the credentials saved for one base URL, or for every base URL. Nothing else is affected: a credential supplied through a flag or an environment variable is not stored here and keeps working.
+.SH "OPTIONS"
+.TP
+\fB\-\-all\fR
+Forget every saved credential, for every base URL. Cannot be combined with \-\-base\-url, which names one.
+.TP
+\fB\-\-base\-url\fR \fIurl\fR
+Forget the credentials saved for this base URL. Cannot be combined with \-\-all.
+.TP
+\fB\-\-environment\fR \fIname\fR
+Forget the credentials saved for the named environment instead of the default. One of: production, void. Falls back to SCALAR_ENVIRONMENT. Cannot be combined with \-\-base\-url or \-\-all.
+.SH "EXIT STATUS"
+.TP
+\fB0\fR
+The command completed successfully.
+.TP
+\fB2\fR
+The command was invoked incorrectly (missing or invalid arguments).
+.TP
+\fB10\fR
+Sign\-in or sign\-out did not complete. The message on standard error says why.
+.SH "SEE ALSO"
+.BR galaxy (1)

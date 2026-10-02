@@ -36,6 +36,9 @@ Print transformed string values without JSON quotes.
 \fB\-\-debug\fR
 Enable SDK debug logging on standard error.
 .TP
+\fB\-\-environment\fR \fI<name>\fR
+Named environment to target: production, void (can also be set with SCALAR_ENVIRONMENT env var) (default: production). Cannot be combined with \-\-base\-url.
+.TP
 \fB\-\-bearer\-auth\fR \fI<value>\fR
 JWT Bearer token authentication. Can also be set with the BEARER_AUTH environment variable.
 .TP
@@ -67,6 +70,9 @@ galaxy celestial\-bodies create \-\-bearer\-auth "$BEARER_AUTH"
 .fi
 .RE
 .SH "ENVIRONMENT"
+.TP
+\fBSCALAR_ENVIRONMENT\fR
+Fallback for \-\-environment when the flag is not passed. Ignored when \-\-base\-url is passed, and refused beside the base URL environment variable.
 .TP
 \fBBEARER_AUTH\fR
 Fallback for \-\-bearer\-auth when the flag is not passed.
