@@ -14,10 +14,11 @@ Generated CLI client for Scalar Galaxy API, published as `@scalar/galaxy-cli`. U
 npm install -g @scalar/galaxy-cli
 
 # Homebrew — standalone binary, no Node.js required
-brew install scalar/galaxy-cli-tap/galaxy
+brew install --cask scalar/galaxy-cli-tap/galaxy
+# Had the `galaxy` formula installed? Run `brew uninstall --formula galaxy` before the install above.
 
 # Direct download — standalone binary, no Node.js required
-curl -fsSL https://github.com/scalar/galaxy-cli/releases/latest/download/galaxy-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m | sed 's/x86_64/x64/;s/aarch64/arm64/').tar.gz | tar xz
+curl -fsSL "https://github.com/scalar/galaxy-cli/releases/latest/download/galaxy-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m | sed 's/x86_64/x64/;s/aarch64/arm64/').tar.gz" | tar xz galaxy
 sudo mv galaxy /usr/local/bin/
 
 # Windows — download and extract galaxy-windows-x64.zip, then add it to PATH
@@ -55,7 +56,7 @@ Failed requests print a structured error to standard error and exit with a statu
 
 - Pass `--format toon` for token-efficient structured output: a uniform list collapses into one header plus a row per item, with a definitive `[N]` count. Use `--format json` when the output is fed to a JSON parser.
 - Use `--max-items <count>` to bound paginated, streaming, and WebSocket commands before they fill the context, and `--transform <dot.path>` to keep only the field you need.
-- Commands never prompt, so they are safe to run non-interactively. Credentials come from the documented environment variables or their flags.
+- Endpoint commands never prompt, so they are safe to run non-interactively. Credentials come from the documented environment variables or their flags. `login` is meant for a human at a terminal, so do not drive it: a flow that reads a credential refuses a non-terminal stdin outright, and a browser or device flow waits for a person to finish signing in elsewhere before it gives up. Set the credential through its environment variable or flag instead.
 - Branch on the exit status rather than on stderr text: `0` success, `1` `error`, `2` `usage`, `10` `auth-failed`, `11` `not-found`, `12` `rate-limited`, `13` `client-error`, `14` `server-error`, `15` `connection-error`. A failed request repeats its class on stderr as a stable `code`, with a `hint` when there is a concrete next step; exit `2` is a plain message with no structured body, because the command never ran.
 - Run `galaxy --help` or `galaxy <resource> --help` to discover commands and flags, and `man galaxy` for the full reference.
 

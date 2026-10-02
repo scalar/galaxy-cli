@@ -31,6 +31,8 @@
   ],
   "man": [
     "./man/galaxy.1",
+    "./man/galaxy-login.1",
+    "./man/galaxy-logout.1",
     "./man/galaxy-planets-list-all-data.1",
     "./man/galaxy-planets-create.1",
     "./man/galaxy-planets-retrieve.1",
@@ -41,6 +43,7 @@
     "./man/galaxy-authentication-create-user.1",
     "./man/galaxy-authentication-create-token.1",
     "./man/galaxy-authentication-list-me.1",
+    "./man/galaxy-environments.1",
     "./man/galaxy-completion.1"
   ],
   "scripts": {

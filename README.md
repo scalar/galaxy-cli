@@ -11,6 +11,8 @@ The full API of this library can be found in [api.md](./api.md).
 - [Installation](#installation)
 - [Usage](#usage)
 - [API Reference](./api.md)
+- [Signing In](#signing-in)
+- [Environments](#environments)
 - [File Arguments](#file-arguments)
 - [Shell Completion](#shell-completion)
 - [Manual Pages](#manual-pages)
@@ -31,10 +33,11 @@ The full API of this library can be found in [api.md](./api.md).
 npm install -g @scalar/galaxy-cli
 
 # Homebrew — standalone binary, no Node.js required
-brew install scalar/galaxy-cli-tap/galaxy
+brew install --cask scalar/galaxy-cli-tap/galaxy
+# Had the `galaxy` formula installed? Run `brew uninstall --formula galaxy` before the install above.
 
 # Direct download — standalone binary, no Node.js required
-curl -fsSL https://github.com/scalar/galaxy-cli/releases/latest/download/galaxy-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m | sed 's/x86_64/x64/;s/aarch64/arm64/').tar.gz | tar xz
+curl -fsSL "https://github.com/scalar/galaxy-cli/releases/latest/download/galaxy-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m | sed 's/x86_64/x64/;s/aarch64/arm64/').tar.gz" | tar xz galaxy
 sudo mv galaxy /usr/local/bin/
 
 # Windows — download and extract galaxy-windows-x64.zip, then add it to PATH
@@ -51,9 +54,39 @@ galaxy [resource] [command] [flags]
 galaxy planets list-all-data --bearer-auth "$BEARER_AUTH" --limit '10' --offset '0'
 ```
 
-The examples in the following sections assume a `client` configured as shown above.
+Every command accepts the global flags below, so the examples that follow show only what is specific to them.
 
 See the [API reference](./api.md) for every available operation.
+
+<br />
+
+## Signing In
+
+`galaxy login` signs you in and saves the credential for later commands, so it does not have to be passed every time. It goes into your operating system's credential store — the system keyring on Linux, Credential Manager on Windows — and falls back to a file in your state directory, readable only by you, when no such store is available. On macOS it is always that file, because the system's own tool accepts a password only on its command line, where other processes could read it. Either way it is filed under the base URL it was captured for, so a credential saved for one host is never sent to another. `galaxy logout` forgets it. A credential passed with a flag, or set in the environment, still takes precedence over a saved one. Both act on the environment selected with `--environment <name>` or `SCALAR_ENVIRONMENT`, so sign in to each environment you call. Sign-in methods: bearer-auth, basic, api-key-header, api-key-query, api-key-cookie, oauth-client-credentials, oauth-password, open-id-connect. Pass `--flow <name>` to pick one without being asked.
+
+```sh
+galaxy login
+galaxy login --flow bearer-auth
+galaxy logout
+galaxy logout --all
+```
+
+<br />
+
+## Environments
+
+This API declares more than one environment. Pass `--environment <name>` to any command to choose one, or leave it off for `production`. `--base-url` sets a URL directly and cannot be combined with it, since each names where the request goes. `galaxy environments` prints the list for reading and takes `--format json` for parsing. Set `SCALAR_ENVIRONMENT` to choose one for every command in a shell; `--environment` and `--base-url` both take precedence over it, and it cannot be set together with the base URL environment variable.
+
+- `production` — `https://galaxy.scalar.com` (default)
+- `void` — `https://void.scalar.com/`
+
+```sh
+# read them; --format json when a script is parsing
+galaxy environments
+
+# call an endpoint against one
+galaxy --environment production COMMAND
+```
 
 <br />
 
@@ -143,6 +176,7 @@ Configure the generated client by setting any of these options when you create i
 | `--timeout` | `<ms>` | - | Request timeout in milliseconds. |
 | `--max-retries` | `<count>` | - | Number of retries for retryable failures. |
 | `--debug` | `flag` | - | Enable SDK debug logging. |
+| `--environment` | `<name>` | `production` | Named environment to target: production, void (can also be set with SCALAR_ENVIRONMENT env var). Cannot be combined with `--base-url`. |
 
 <br />
 

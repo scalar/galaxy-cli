@@ -1,0 +1,65 @@
+.\" File generated from our OpenAPI spec by Scalar. Do not edit.
+.TH "GALAXY\-LOGIN" "1" "" "galaxy" "Scalar Galaxy Manual"
+.SH "NAME"
+galaxy\-login \- sign in and save credentials
+.SH "SYNOPSIS"
+.B galaxy login
+[\fB\-\-flow\fR \fIname\fR] [\fB\-\-base\-url\fR \fIurl\fR] [\fB\-\-environment\fR \fIname\fR]
+.SH "DESCRIPTION"
+Obtains a credential and saves it so later commands do not have to carry one. It goes into your operating system's credential store \- the system keyring on Linux, Credential Manager on Windows \- and falls back to a file in your state directory, readable only by you, when no such store is available. On macOS it is always that file, because the system's own tool accepts a password only on its command line, where other processes could read it. Either way it is filed under the base URL it was captured for, so a credential saved for one host is never sent to another. A credential passed with a flag, or set in the environment, still takes precedence over a saved one.
+.SH "OPTIONS"
+.TP
+\fB\-\-flow\fR \fIname\fR
+Sign\-in flow to use, skipping the prompt. One of: bearer\-auth, basic, api\-key\-header, api\-key\-query, api\-key\-cookie, oauth\-client\-credentials, oauth\-password, open\-id\-connect.
+.TP
+\fB\-\-base\-url\fR \fIurl\fR
+Sign in against this base URL instead of the default.
+.TP
+\fB\-\-environment\fR \fIname\fR
+Sign in to the named environment instead of the default. One of: production, void. Falls back to SCALAR_ENVIRONMENT. Cannot be combined with \-\-base\-url.
+.SH "SIGN\-IN FLOWS"
+.TP
+\fBbearer\-auth\fR
+Enter your access token.
+.TP
+\fBbasic\fR
+Username and password for basic auth.
+.TP
+\fBapi\-key\-header\fR
+Enter your API key.
+.TP
+\fBapi\-key\-query\fR
+Enter your API key.
+.TP
+\fBapi\-key\-cookie\fR
+Enter your API key.
+.TP
+\fBoauth\-client\-credentials\fR
+Sign in with a client id and secret (OAuth client credentials).
+.TP
+\fBoauth\-password\fR
+Sign in with a username and password (OAuth password grant).
+.TP
+\fBopen\-id\-connect\fR
+Paste an access token you already have.
+.SH "EXAMPLES"
+.PP
+.RS 4
+.nf
+galaxy login
+galaxy login \-\-flow bearer\-auth
+.fi
+.RE
+.SH "EXIT STATUS"
+.TP
+\fB0\fR
+The command completed successfully.
+.TP
+\fB2\fR
+The command was invoked incorrectly (missing or invalid arguments).
+.TP
+\fB10\fR
+Sign\-in or sign\-out did not complete. The message on standard error says why.
+.SH "SEE ALSO"
+.BR galaxy (1),
+.BR galaxy\-logout (1)
