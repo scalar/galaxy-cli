@@ -43,7 +43,7 @@ jobs:
           # credential (so their CI runs without manual approval); this workflow only
           # cuts the tag + GitHub Release once a release PR is merged.
           skip-github-pull-request: true
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: ${{ steps.release.outputs.release_created == 'true' }}
         with:
           fetch-depth: 0
@@ -87,10 +87,81 @@ jobs:
       # (never a reusable-workflow call). The release-please job cut the tag earlier in this
       # run; checking it out publishes exactly the released commit, not the branch head that
       # triggered the workflow.
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.release-please.outputs.tag_name }}
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      # Runs before any npm publish, the compile, and any archive upload. The signing step itself
+      # comes after all but the upload, because it needs the compiled executables; a missing or
+      # unusable secret found there would waste the compile and, when npm is published to, leave the
+      # npm version out ahead of the binaries. The tag and the GitHub Release already exist either way (release-please
+      # cut them before this job started), so a failure here still leaves a release to publish again
+      # once the secret is stored, but nothing has shipped that the second attempt has to reconcile.
+      - name: Check macOS signing secrets
+        env:
+          MACOS_SIGN_P12: ${{ secrets.MACOS_SIGN_P12 }}
+          MACOS_SIGN_PASSWORD: ${{ secrets.MACOS_SIGN_PASSWORD }}
+          MACOS_NOTARY_ISSUER_ID: ${{ secrets.MACOS_NOTARY_ISSUER_ID }}
+          MACOS_NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_KEY_ID }}
+          MACOS_NOTARY_KEY: ${{ secrets.MACOS_NOTARY_KEY }}
+        run: |
+          set -euo pipefail
+
+          # Each failure names the secret that is missing. Left to the signing tool, the same
+          # mistake surfaces as an error that does not say which secret it is.
+          if [ -z "$MACOS_SIGN_P12" ]; then
+            echo "::error::macOS signing is enabled but the MACOS_SIGN_P12 secret is empty. Store the Developer ID Application certificate in it as a base64-encoded .p12 bundle." >&2
+            exit 1
+          fi
+          if [ -z "$MACOS_SIGN_PASSWORD" ]; then
+            # A warning, not an error: a passwordless .p12 is legitimate. It is worth saying anyway,
+            # because the far likelier cause is a password stored under another name, and the error
+            # the open below reports for that does not say the secret was empty.
+            echo "::warning::The MACOS_SIGN_PASSWORD secret is empty. Continuing, which is correct only if the .p12 bundle really has no password." >&2
+          fi
+
+          # Present is not the same as usable. A certificate stored raw rather than base64-encoded,
+          # or a password that does not open it, would otherwise surface only in "Sign macOS
+          # binaries" — after the compile and after any npm publish — so the bundle is decoded and
+          # opened here as that step does. Only the still-encrypted bundle touches disk, in a private
+          # directory removed on the way out; the decrypted output goes to /dev/null, since all this
+          # step needs is whether it opens. The signing step decodes the secret again.
+          CHECK_DIR="$(mktemp -d)"
+          chmod 700 "$CHECK_DIR"
+          trap 'rm -rf "$CHECK_DIR"' EXIT
+          if ! printf '%s' "$MACOS_SIGN_P12" | base64 -d > "$CHECK_DIR/certificate.p12"; then
+            echo "::error::The MACOS_SIGN_P12 secret is not valid base64. Store the .p12 bundle base64-encoded, e.g. \`base64 -i certificate.p12 | pbcopy\` on macOS." >&2
+            exit 1
+          fi
+          if ! openssl pkcs12 -legacy -in "$CHECK_DIR/certificate.p12" -passin env:MACOS_SIGN_PASSWORD \
+              -clcerts -noenc -out /dev/null; then
+            echo "::error::Could not open the MACOS_SIGN_P12 certificate with the MACOS_SIGN_PASSWORD secret. Check that the password is the one the .p12 bundle was exported with, and that the bundle holds the certificate's private key." >&2
+            exit 1
+          fi
+          # Notarization authenticates with an App Store Connect API key, stored as its three parts.
+          for secret in MACOS_NOTARY_ISSUER_ID MACOS_NOTARY_KEY_ID MACOS_NOTARY_KEY; do
+            if [ -z "${!secret}" ]; then
+              echo "::error::macOS notarization is enabled but the ${secret} secret is empty. Store the App Store Connect API key's issuer ID, key ID, and .p8 private key in MACOS_NOTARY_ISSUER_ID, MACOS_NOTARY_KEY_ID, and MACOS_NOTARY_KEY, or set targets.cli.publish.signing.macos to 'sign' to sign without notarizing." >&2
+              exit 1
+            fi
+          done
+
+          # The .p8 is accepted as its PEM text or base64-encoded, and the shape is checked here with
+          # the rest rather than only when the notarize block assembles the key, after the compile.
+          # A base64 value has to decode to PEM too: rcodesign reads the key as PEM, so the body
+          # alone, or a DER key, would decode cleanly here and only fail at notarization.
+          case "$MACOS_NOTARY_KEY" in
+            *"-----BEGIN"*) ;;
+            *)
+              # Decoded into a variable rather than piped into `grep -q`, which can exit on the first
+              # match and fail a valid key under `pipefail` when `base64` is still writing.
+              if ! NOTARY_KEY_PEM="$(printf '%s' "$MACOS_NOTARY_KEY" | base64 -d 2> /dev/null)" \
+                || [[ "$NOTARY_KEY_PEM" != *"-----BEGIN"* ]]; then
+                echo "::error::The MACOS_NOTARY_KEY secret is neither a PEM private key nor a base64-encoded one. Store the App Store Connect API key's .p8 file in it, as-is or base64-encoded." >&2
+                exit 1
+              fi
+              ;;
+          esac
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "24"
           registry-url: "https://registry.npmjs.org"
@@ -120,23 +191,193 @@ jobs:
       # TypeScript directly, and going through `dist/` would only add the emitted ESM specifier
       # rewriting as a failure mode between the source and the shipped binary.
       #
+      # Each target compiles into its own `compile-out/<target>/` directory rather than straight
+      # into an archive, so anything that has to touch an executable can run as a step between this
+      # one and packaging — code signing, when it is configured — and the archive is always built
+      # from whatever those steps left behind.
+      - name: Compile standalone binaries
+        run: |
+          rm -rf compile-out
+          for target in linux-x64 linux-arm64 darwin-x64 darwin-arm64 windows-x64; do
+            mkdir -p "compile-out/${target}"
+            case "$target" in
+              windows-*)
+                bun build src/bin.ts --compile --minify --target="bun-${target}" --outfile "compile-out/${target}/galaxy.exe"
+                ;;
+              *)
+                bun build src/bin.ts --compile --minify --target="bun-${target}" --outfile "compile-out/${target}/galaxy"
+                ;;
+            esac
+          done
+      # The macOS executables are cross-compiled on this Linux runner, and the ad-hoc signature Bun
+      # leaves on them is not one macOS accepts: Apple Silicon refuses to execute a Mach-O whose
+      # signature does not validate, and Gatekeeper blocks a downloaded binary that carries no
+      # Developer ID. Re-signing here, before the archives are packed, fixes both.
+      #
+      # rcodesign reimplements Apple's signing and notarization protocols, so this runs alongside the
+      # compile on one Linux runner; `codesign` and `notarytool` are macOS-only and would have split
+      # the release into a second job that ships artifacts between the two. It is pinned to an exact
+      # release and verified against a digest because this is the step that handles the certificate.
+      - name: Sign macOS binaries
+        env:
+          MACOS_SIGN_P12: ${{ secrets.MACOS_SIGN_P12 }}
+          MACOS_SIGN_PASSWORD: ${{ secrets.MACOS_SIGN_PASSWORD }}
+          MACOS_NOTARY_ISSUER_ID: ${{ secrets.MACOS_NOTARY_ISSUER_ID }}
+          MACOS_NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_KEY_ID }}
+          MACOS_NOTARY_KEY: ${{ secrets.MACOS_NOTARY_KEY }}
+        run: |
+          # `pipefail` earns its place here: the certificate reaches disk through a pipe, and without
+          # it a failed decode leaves an empty file whose only symptom is a confusing signing error.
+          # The secrets themselves were checked by "Check macOS signing secrets", right after checkout.
+          set -euo pipefail
+
+          RCODESIGN_DIR="apple-codesign-0.29.0-x86_64-unknown-linux-musl"
+          curl -fsSL -o rcodesign.tar.gz "https://github.com/indygreg/apple-platform-rs/releases/download/apple-codesign%2F0.29.0/${RCODESIGN_DIR}.tar.gz"
+          echo "dbe85cedd8ee4217b64e9a0e4c2aef92ab8bcaaa41f20bde99781ff02e600002  rcodesign.tar.gz" | sha256sum -c -
+          tar -xzf rcodesign.tar.gz
+          RCODESIGN="$PWD/${RCODESIGN_DIR}/rcodesign"
+
+          # Certificate material is written to a private directory the step removes on the way out,
+          # including when it fails or is cancelled, so nothing later in the job reads it back off
+          # the workspace. A SIGKILL still bypasses the trap, which on a hosted runner leaves the
+          # material on a VM that is destroyed with the job anyway.
+          #
+          # Cleanup hangs off EXIT alone. The signal traps only exit, which then runs it: adding the
+          # signals to the cleanup handler instead makes bash run the handler and *resume the
+          # script*, so a run cancelled during the notarization wait would delete the certificate
+          # mid-flight, carry on without it, and report success.
+          SIGNING_DIR="$(mktemp -d)"
+          chmod 700 "$SIGNING_DIR"
+          trap 'rm -rf "$SIGNING_DIR" rcodesign.tar.gz "$RCODESIGN_DIR"' EXIT
+          trap 'exit 130' INT
+          trap 'exit 143' TERM
+
+          # Decoding is checked rather than left to `pipefail` alone, because storing the raw .p12
+          # instead of a base64 encoding of it is the easiest mistake to make here and `base64:
+          # invalid input` does not say which secret is wrong or what shape it should have been.
+          # "Check macOS signing secrets" already decoded and opened the bundle before anything was
+          # published; this and the open below stay so this step never signs with a bundle it has
+          # not checked itself.
+          if ! printf '%s' "$MACOS_SIGN_P12" | base64 -d > "$SIGNING_DIR/certificate.p12"; then
+            echo "::error::The MACOS_SIGN_P12 secret is not valid base64. Store the .p12 bundle base64-encoded, e.g. \`base64 -i certificate.p12 | pbcopy\` on macOS." >&2
+            exit 1
+          fi
+          # The .p12 is unpacked to PEM with OpenSSL rather than handed to rcodesign, whose PKCS#12
+          # reader only knows the legacy ciphers macOS Keychain Access exports with: a bundle built
+          # by OpenSSL 3 — the usual route on Linux, pairing the downloaded .cer with the CSR's key —
+          # is AES-256/PBKDF2 by default, and rcodesign reports it as "incorrect password" even when
+          # the password is right. OpenSSL reads both (`-legacy` adds the RC2 and 3DES ciphers
+          # Keychain Access uses), so every bundle takes the one path.
+          #
+          # The password is read from the environment, which is empty-safe and never on the command
+          # line. The leaf certificate and its key go to one file and any CA chain to another,
+          # because rcodesign pairs the key with the first certificate it reads: a bundle listing
+          # its chain first would otherwise sign with the wrong certificate.
+          if ! openssl pkcs12 -legacy -in "$SIGNING_DIR/certificate.p12" -passin env:MACOS_SIGN_PASSWORD \
+              -clcerts -noenc -out "$SIGNING_DIR/certificate.pem" \
+            || ! openssl pkcs12 -legacy -in "$SIGNING_DIR/certificate.p12" -passin env:MACOS_SIGN_PASSWORD \
+              -cacerts -nokeys -out "$SIGNING_DIR/chain.pem"; then
+            echo "::error::Could not open the MACOS_SIGN_P12 certificate with the MACOS_SIGN_PASSWORD secret. Check that the password is the one the .p12 bundle was exported with, and that the bundle holds the certificate's private key." >&2
+            exit 1
+          fi
+
+          # Bun's JavaScript engine JITs, so a binary signed with the hardened runtime — which
+          # notarization requires — dies the moment the engine allocates executable memory unless
+          # these three entitlements grant it the exception.
+          #
+          # Bun documents two more alongside them, `allow-dyld-environment-variables` and
+          # `disable-library-validation`, and they are deliberately left out: neither has anything to
+          # do with JIT, and together they let any local process load an unsigned dylib into this
+          # binary through DYLD_INSERT_LIBRARIES — code that would then run under the publisher's
+          # signing identity and inherit whatever the CLI has been granted. That trade buys nothing
+          # here: this CLI and the JavaScript packages it bundles are pure JavaScript, so nothing in
+          # the executable dlopens a library, uses FFI, or loads a native addon. A build that grows
+          # one of those needs `disable-library-validation` back, and this comment is the record of
+          # why it was gone.
+          cat > "$SIGNING_DIR/entitlements.plist" <<'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>com.apple.security.cs.allow-jit</key>
+              <true/>
+              <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+              <true/>
+              <key>com.apple.security.cs.disable-executable-page-protection</key>
+              <true/>
+          </dict>
+          </plist>
+          PLIST
+
+          for target in darwin-x64 darwin-arm64; do
+            "$RCODESIGN" sign \
+              --pem-file "$SIGNING_DIR/certificate.pem" \
+              --pem-file "$SIGNING_DIR/chain.pem" \
+              --entitlements-xml-file "$SIGNING_DIR/entitlements.plist" \
+              --for-notarization \
+              "compile-out/${target}/galaxy"
+          done
+          # Signing alone only makes the binary runnable; Gatekeeper still blocks it on download
+          # until Apple has notarized it. The notary service accepts an archive rather than a bare
+          # executable, and a ticket cannot be stapled onto a bare Mach-O in any case, so both
+          # architectures are submitted together in one zip: Apple records a ticket per code
+          # directory hash, and Gatekeeper resolves those online the first time the binary runs.
+          #
+          # The notary secrets were checked by "Check macOS signing secrets", right after checkout.
+          #
+          # rcodesign reads the API key as one JSON document, so it is assembled here from the three
+          # secrets. The .p8 private key goes through a file; the issuer and key IDs are identifiers,
+          # not credentials, so passing them as arguments exposes nothing. The key is accepted either
+          # as its PEM text or base64-encoded, the two shapes it is commonly stored in.
+          case "$MACOS_NOTARY_KEY" in
+            *"-----BEGIN"*)
+              printf '%s\n' "$MACOS_NOTARY_KEY" > "$SIGNING_DIR/notary-key.p8"
+              ;;
+            *)
+              if ! printf '%s' "$MACOS_NOTARY_KEY" | base64 -d > "$SIGNING_DIR/notary-key.p8" \
+                || ! grep -q -- '-----BEGIN' "$SIGNING_DIR/notary-key.p8"; then
+                echo "::error::The MACOS_NOTARY_KEY secret is neither a PEM private key nor a base64-encoded one. Store the App Store Connect API key's .p8 file in it, as-is or base64-encoded." >&2
+                exit 1
+              fi
+              ;;
+          esac
+          "$RCODESIGN" encode-app-store-connect-api-key \
+            --output-path "$SIGNING_DIR/notary-key.json" \
+            "$MACOS_NOTARY_ISSUER_ID" "$MACOS_NOTARY_KEY_ID" "$SIGNING_DIR/notary-key.p8"
+          (cd compile-out && zip -qr "$SIGNING_DIR/notarize.zip" darwin-x64 darwin-arm64)
+
+          # The wait is raised from rcodesign's 600-second default: a first submission from a new
+          # team can sit in Apple's queue longer than that, and timing out here fails a release whose
+          # npm version (when npm is published to) is already out, even though Apple goes on to
+          # accept the submission.
+          "$RCODESIGN" notary-submit \
+            --api-key-path "$SIGNING_DIR/notary-key.json" \
+            --wait \
+            --max-wait-seconds 1800 \
+            "$SIGNING_DIR/notarize.zip"
       # Asset names carry no version: the release tag in the download path already does, and a
       # stable file name is what makes `releases/latest/download/<name>` resolve, so install
       # instructions can point at "latest" without being rewritten every release.
-      - name: Compile standalone binaries
+      #
+      # Each tarball carries the generated man pages beside the executable, so Homebrew — and anyone
+      # unpacking the download — installs `man galaxy` too rather than only the npm package doing
+      # so. Windows has no `man`, so its zip stays the executable alone.
+      #
+      # They are copied in here rather than at compile time so that what any signing step above saw
+      # — and, when notarization is on, what was uploaded to Apple, which zips these directories
+      # whole — is the executables alone.
+      - name: Package release archives
         run: |
           ROOT="$PWD"
           mkdir -p release-binaries
           for target in linux-x64 linux-arm64 darwin-x64 darwin-arm64 windows-x64; do
-            rm -rf compile-out && mkdir -p compile-out
             case "$target" in
               windows-*)
-                bun build src/bin.ts --compile --minify --target="bun-${target}" --outfile "compile-out/galaxy.exe"
-                (cd compile-out && zip -q "$ROOT/release-binaries/galaxy-${target}.zip" "galaxy.exe")
+                (cd "compile-out/${target}" && zip -q "$ROOT/release-binaries/galaxy-${target}.zip" "galaxy.exe")
                 ;;
               *)
-                bun build src/bin.ts --compile --minify --target="bun-${target}" --outfile "compile-out/galaxy"
-                tar -czf "release-binaries/galaxy-${target}.tar.gz" -C compile-out "galaxy"
+                cp -R "man" "compile-out/${target}/man"
+                tar -czf "release-binaries/galaxy-${target}.tar.gz" -C "compile-out/${target}" "galaxy" "man"
                 ;;
             esac
           done
@@ -147,7 +388,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Update Homebrew tap
         env:
-          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN || secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
         run: |
           # Reads back the archives the preceding asset step just uploaded. That step runs
           # `gh release upload` on the ambient GITHUB_TOKEN, which can only write releases in
@@ -157,53 +398,53 @@ jobs:
           # every release, having uploaded the archives perfectly well one step earlier.
           BASE_URL="https://github.com/${{ github.repository }}/releases/download/v${PKG_VERSION}"
           git clone "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/scalar/homebrew-galaxy-cli-tap.git" tap
-          mkdir -p tap/Formula
-          # Each archive holds a single `bun build --compile` executable with the Bun runtime and
-          # every dependency embedded, so the formula declares no `depends_on` and installs the
-          # binary as-is — `brew install` no longer pulls Node in as a dependency.
+          mkdir -p tap/Casks
+          # A cask rather than a formula: Homebrew's own home for prebuilt executables. It pins the same
+          # archives a formula would, and Homebrew installs it on Linux as well as macOS. Unlike a
+          # formula, though, everything a cask downloads is quarantined the way a browser download is,
+          # so Gatekeeper checks the macOS executable the first time it runs and refuses one Apple has
+          # not notarized. That is why the generator only emits this step alongside notarization.
           #
-          # The formula file is lowercase even when the command it installs is not: Homebrew resolves
-          # `brew install <owner>/<tap>/<name>` to `Formula/<name>.rb`, and that lookup is case-sensitive
-          # on Linux. The `bin.install` below still installs the command under its own spelling.
-          cat > "tap/Formula/galaxy.rb" <<'EOF'
-          class Galaxy < Formula
-            desc "The Scalar Galaxy CLI Interface"
-            homepage "https://scalar.com"
+          # The file and its token are lowercase for the same reason a formula's are: Homebrew resolves
+          # `brew install --cask <owner>/<tap>/<name>` to `Casks/<name>.rb`, and that lookup is
+          # case-sensitive on Linux. `binary` still links the command under its own spelling.
+          PACKAGE="tap/Casks/galaxy.rb"
+          # The heredoc stops before the stanzas that come last in a cask — each `manpage`, the completion
+          # line and the closing `end` — which the step appends once the URLs are pinned. `brew style`
+          # orders a cask's stanzas, so within each platform `sha256` precedes `url`, and the platform
+          # blocks sit together with no blank line between them.
+          cat > "$PACKAGE" <<'EOF'
+          cask "galaxy" do
             version "__VERSION__"
 
             on_macos do
               on_arm do
-                url "__URL_DARWIN_ARM64__"
                 sha256 "__SHA_DARWIN_ARM64__"
+                url "__URL_DARWIN_ARM64__"
               end
               on_intel do
-                url "__URL_DARWIN_X64__"
                 sha256 "__SHA_DARWIN_X64__"
+                url "__URL_DARWIN_X64__"
               end
             end
-
             on_linux do
               on_arm do
-                url "__URL_LINUX_ARM64__"
                 sha256 "__SHA_LINUX_ARM64__"
+                url "__URL_LINUX_ARM64__"
               end
               on_intel do
-                url "__URL_LINUX_X64__"
                 sha256 "__SHA_LINUX_X64__"
+                url "__URL_LINUX_X64__"
               end
             end
 
-            def install
-              bin.install "galaxy"
-            end
+            name "galaxy"
+            desc "The Scalar Galaxy CLI Interface"
+            homepage "https://scalar.com/"
 
-            test do
-              system "#{bin}/galaxy", "--help"
-            end
-          end
+            binary "galaxy"
           EOF
-          FORMULA="tap/Formula/galaxy.rb"
-          # Homebrew resolves one url/sha256 pair per platform at install time, but the formula is a
+          # Homebrew resolves one url/sha256 pair per platform at install time, but the cask is a
           # single file, so every platform the tap supports has to be pinned on every release.
           for target in linux-x64 linux-arm64 darwin-x64 darwin-arm64; do
             ASSET="galaxy-${target}.tar.gz"
@@ -211,14 +452,60 @@ jobs:
             SHA256="$(shasum -a 256 "$ASSET" | cut -d" " -f1)"
             # `darwin-arm64` names the `__URL_DARWIN_ARM64__`/`__SHA_DARWIN_ARM64__` placeholder
             # pair, so the loop stays driven by the target list instead of a hand-written sed per
-            # platform that can silently fall out of step with the formula above.
+            # platform that can silently fall out of step with the cask above.
             TOKEN="$(echo "$target" | tr "a-z-" "A-Z_")"
-            sed -i -e "s|__URL_${TOKEN}__|$BASE_URL/$ASSET|" -e "s|__SHA_${TOKEN}__|$SHA256|" "$FORMULA"
+            sed -i -e "s|__URL_${TOKEN}__|$BASE_URL/$ASSET|" -e "s|__SHA_${TOKEN}__|$SHA256|" "$PACKAGE"
           done
-          sed -i -e "s|__VERSION__|$PKG_VERSION|" "$FORMULA"
+          sed -i -e "s|__VERSION__|$PKG_VERSION|" "$PACKAGE"
+          # `brew audit` wants the version in a cask's URLs written as `#{version}` rather than as the
+          # literal the pinning loop above filled in: a URL whose version does not follow the `version`
+          # stanza reads as unversioned, and an unversioned URL is expected to carry `sha256 :no_check`.
+          # Only the `url` lines change, and only the release tag's `v<version>` path segment.
+          sed -i -e "/^ *url /s|/v${PKG_VERSION//./\\.}/|/v#{version}/|" "$PACKAGE"
+          # A cask has no install block to glob the man pages from, so each page the archive carries
+          # gets a `manpage` stanza of its own. They are listed from the same `man` directory the
+          # archives were packed from earlier in this job, so the cask never names a page the archive
+          # lacks. Page names are the generator's command-safe stems, which cannot carry a quote.
+          for page in man/*.1; do
+            [ -e "$page" ] || continue
+            echo "  manpage \"$page\"" >> "$PACKAGE"
+          done
+          echo '  generate_completions_from_executable "galaxy", "completion"' >> "$PACKAGE"
+          echo "end" >> "$PACKAGE"
           cd tap
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add "Formula/galaxy.rb"
-          git commit -m "galaxy ${PKG_VERSION}" || { echo "formula unchanged, skipping"; exit 0; }
+          git add "Casks/galaxy.rb"
+          # A formula of the same name — what this workflow wrote before the tap switched to a cask, or
+          # what GoReleaser's `brews` writes — would otherwise shadow this cask. Homebrew resolves a
+          # name to a formula before a cask, so `brew install <owner>/<tap>/<name>` would go on
+          # installing the formula's last version, and machines that installed it would stay there.
+          # Deleting it and naming this tap in `tap_migrations.json`, in the same commit as the cask,
+          # is Homebrew's own formula-to-cask migration: `brew update` sees the formula deleted, finds
+          # the entry, and — because the tap now holds a cask by that name — unlinks the formula and
+          # installs the cask when the cask or the tap is trusted. Otherwise, the default since
+          # Homebrew 6, it prints the `brew trust` and `brew install` commands that finish the move
+          # instead. Only the deletion triggers it, so the entry is written alongside it and then left
+          # alone: a machine that has not updated since still needs it the next time it does.
+          #
+          # `Formula` is gone after the first such release, and GitHub runs this step under `bash -e`,
+          # so the lookup is guarded rather than left to a `find` that fails on a missing directory.
+          #
+          # Only a formula that installs this very command is retired. A same-named formula for
+          # anything else is someone else's package, and migrating its installs onto this cask would
+          # replace it with the CLI on every machine that updates.
+          FORMULA_FILE=""
+          if [ -d Formula ]; then
+            FORMULA_FILE="$(find Formula -type f -name "galaxy.rb" -print -quit)"
+          fi
+          if [ -n "$FORMULA_FILE" ] && grep -Fq 'bin.install "galaxy"' "$FORMULA_FILE"; then
+            git rm -q "$FORMULA_FILE"
+            [ -f tap_migrations.json ] || echo "{}" > tap_migrations.json
+            jq --arg name "galaxy" --arg tap "scalar/galaxy-cli-tap" '.[$name] = $tap' tap_migrations.json > tap_migrations.json.tmp
+            mv tap_migrations.json.tmp tap_migrations.json
+            git add tap_migrations.json
+          elif [ -n "$FORMULA_FILE" ]; then
+            echo "Leaving $FORMULA_FILE in place: it does not install the galaxy command, so its installs are not migrated to this cask."
+          fi
+          git commit -m "galaxy ${PKG_VERSION}" || { echo "cask unchanged, skipping"; exit 0; }
           git push
