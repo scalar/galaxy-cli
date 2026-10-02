@@ -38,6 +38,9 @@ Print transformed string values without JSON quotes.
 \fB\-\-debug\fR
 Enable SDK debug logging on standard error.
 .TP
+\fB\-\-environment\fR \fI<name>\fR
+Named environment to target: production, void (can also be set with SCALAR_ENVIRONMENT env var) (default: production). Cannot be combined with \-\-base\-url.
+.TP
 \fB\-\-bearer\-auth\fR \fI<value>\fR
 JWT Bearer token authentication. Can also be set with the BEARER_AUTH environment variable.
 .TP
@@ -93,8 +96,25 @@ Get a token. See galaxy\-authentication\-create\-token(1).
 \fBgalaxy authentication list\-me\fR
 Get authenticated user. See galaxy\-authentication\-list\-me(1).
 .TP
+\fBgalaxy environments\fR
+List the named environments \-\-environment can select. See galaxy\-environments(1).
+.TP
 \fBgalaxy completion\fR
 Print a shell completion script. See galaxy\-completion(1).
+.TP
+\fBgalaxy login\fR
+Sign in and save credentials for later commands. See galaxy\-login(1).
+.TP
+\fBgalaxy logout\fR
+Forget saved credentials. See galaxy\-logout(1).
+.SH "ENVIRONMENTS"
+\-\-environment selects one of these base URLs, or SCALAR_ENVIRONMENT when the flag is not passed, and production is used when neither is. Run galaxy environments to print the same list.
+.TP
+\fBproduction\fR
+https://galaxy.scalar.com (default)
+.TP
+\fBvoid\fR
+https://void.scalar.com/
 .SH "FILE ARGUMENTS"
 Any command flag or credential reads its value from a file when the value begins with @. A flag shown with a <path> value uploads a file and takes its path with or without the @. The global options above are read exactly as written.
 .PP
@@ -117,6 +137,9 @@ galaxy completion fish | source
 .fi
 .RE
 .SH "ENVIRONMENT"
+.TP
+\fBSCALAR_ENVIRONMENT\fR
+Fallback for \-\-environment when the flag is not passed. Ignored when \-\-base\-url is passed, and refused beside the base URL environment variable.
 .TP
 \fBBEARER_AUTH\fR
 Fallback for \-\-bearer\-auth when the flag is not passed.

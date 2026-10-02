@@ -1,0 +1,61 @@
+.\" File generated from our OpenAPI spec by Scalar. Do not edit.
+.TH "GALAXY\-ENVIRONMENTS" "1" "" "galaxy" "Scalar Galaxy Manual"
+.SH "NAME"
+galaxy\-environments \- list the named environments this API declares
+.SH "SYNOPSIS"
+.B galaxy environments
+[\fB\-\-format\fR \fI<format>\fR]
+.SH "DESCRIPTION"
+Prints every environment \-\-environment accepts, with the base URL it selects and which one is used by default. The list comes from the same table galaxy resolves the flag against, so it always describes this version's environments.
+.SH "OPTIONS"
+.TP
+\fB\-\-format\fR \fI<format>\fR
+Output format: auto, json, jsonl, pretty, raw, toon, yaml. Without one, or with auto or pretty, the list is drawn for a reader: the default marked, each base URL behind its name, and colour only when standard output is a terminal. Name a machine format to parse it.
+.SH "ENVIRONMENTS"
+\-\-environment selects one of these base URLs, or SCALAR_ENVIRONMENT when the flag is not passed, and production is used when neither is. Run galaxy environments to print the same list.
+.TP
+\fBproduction\fR
+https://galaxy.scalar.com (default)
+.TP
+\fBvoid\fR
+https://void.scalar.com/
+.SH "EXAMPLES"
+Print the environments, then call an endpoint against one of them:
+.PP
+.RS 4
+.nf
+galaxy environments
+galaxy environments \-\-format json
+galaxy \-\-environment production COMMAND
+.fi
+.RE
+.SH "EXIT STATUS"
+.TP
+\fB0\fR
+The command completed successfully.
+.TP
+\fB1\fR
+The request failed for an unclassified reason. Reported as error.
+.TP
+\fB2\fR
+The command was invoked incorrectly (missing or invalid arguments).
+.TP
+\fB10\fR
+Authentication or authorization failed (HTTP 401 or 403). Reported as auth\-failed.
+.TP
+\fB11\fR
+The requested resource does not exist (HTTP 404). Reported as not\-found.
+.TP
+\fB12\fR
+The request was rate limited (HTTP 429). Reported as rate\-limited.
+.TP
+\fB13\fR
+The request was rejected (any other HTTP 4xx). Reported as client\-error.
+.TP
+\fB14\fR
+The API failed to handle the request (HTTP 5xx). Reported as server\-error.
+.TP
+\fB15\fR
+The API could not be reached, or the request timed out. Reported as connection\-error.
+.SH "SEE ALSO"
+.BR galaxy (1)
