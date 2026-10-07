@@ -336,6 +336,7 @@ export const storeDescription = (location: CredentialStoreLocation, backend: Sto
 
 const osStoreName = (): string => {
   if (process.platform === 'win32') return 'Windows Credential Manager';
+  if (process.platform === 'darwin') return 'macOS Keychain';
   return 'system keyring';
 };
 
