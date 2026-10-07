@@ -62,7 +62,7 @@ See the [API reference](./api.md) for every available operation.
 
 ## Signing In
 
-`galaxy login` signs you in and saves the credential for later commands, so it does not have to be passed every time. It goes into your operating system's credential store — the system keyring on Linux, Credential Manager on Windows — and falls back to a file in your state directory, readable only by you, when no such store is available. On macOS it is always that file, because the system's own tool accepts a password only on its command line, where other processes could read it. Either way it is filed under the base URL it was captured for, so a credential saved for one host is never sent to another. `galaxy logout` forgets it. A credential passed with a flag, or set in the environment, still takes precedence over a saved one. Both act on the environment selected with `--environment <name>` or `SCALAR_ENVIRONMENT`, so sign in to each environment you call. Sign-in methods: bearer-auth, basic, api-key-header, api-key-query, api-key-cookie, oauth-client-credentials, oauth-password, open-id-connect. Pass `--flow <name>` to pick one without being asked.
+`galaxy login` signs you in and saves the credential for later commands, so it does not have to be passed every time. It goes into your operating system's credential store — the Keychain on macOS, the system keyring on Linux, Credential Manager on Windows — and falls back to a file in your state directory, readable only by you, when no such store is available. Either way it is filed under the base URL it was captured for, so a credential saved for one host is never sent to another. `galaxy logout` forgets it. A credential passed with a flag, or set in the environment, still takes precedence over a saved one. Both act on the environment selected with `--environment <name>` or `SCALAR_ENVIRONMENT`, so sign in to each environment you call. Sign-in methods: bearer-auth, basic, api-key-header, api-key-query, api-key-cookie, oauth-client-credentials, oauth-password, open-id-connect. Pass `--flow <name>` to pick one without being asked.
 
 ```sh
 galaxy login
@@ -137,14 +137,14 @@ Pass credentials to the generated client constructor. Environment variables are 
 
 | Option | Type | Default | Description |
 | --- | --- | --- | --- |
-| `--bearer-auth` | `string \| provider` | - | JWT Bearer token authentication Defaults to BEARER_AUTH. |
-| `--basic-auth-username` | `string \| provider` | - | Basic HTTP authentication Defaults to BASIC_AUTH_USERNAME. |
-| `--basic-auth-password` | `string \| provider` | - | Basic HTTP authentication Defaults to BASIC_AUTH_PASSWORD. |
-| `--api-key-header` | `string \| provider` | - | API key request header Defaults to API_KEY_HEADER. |
-| `--api-key-query` | `string \| provider` | - | API key query parameter Defaults to API_KEY_QUERY. |
-| `--api-key-cookie` | `string \| provider` | - | API key browser cookie Defaults to API_KEY_COOKIE. |
-| `--o-auth2` | `string \| provider` | - | OAuth 2.0 authentication Defaults to SCALAR_O_AUTH2. |
-| `--open-id-connect` | `string \| provider` | - | OpenID Connect Authentication Defaults to SCALAR_OPEN_ID_CONNECT. |
+| `--bearer-auth` | `<value>` | - | JWT Bearer token authentication Defaults to BEARER_AUTH. |
+| `--basic-auth-username` | `<value>` | - | Basic HTTP authentication Defaults to BASIC_AUTH_USERNAME. |
+| `--basic-auth-password` | `<value>` | - | Basic HTTP authentication Defaults to BASIC_AUTH_PASSWORD. |
+| `--api-key-header` | `<value>` | - | API key request header Defaults to API_KEY_HEADER. |
+| `--api-key-query` | `<value>` | - | API key query parameter Defaults to API_KEY_QUERY. |
+| `--api-key-cookie` | `<value>` | - | API key browser cookie Defaults to API_KEY_COOKIE. |
+| `--o-auth2` | `<value>` | - | OAuth 2.0 authentication Defaults to SCALAR_O_AUTH2. |
+| `--open-id-connect` | `<value>` | - | OpenID Connect Authentication Defaults to SCALAR_OPEN_ID_CONNECT. |
 
 Declared schemes:
 
