@@ -51,7 +51,7 @@ sudo mv galaxy /usr/local/bin/
 ```sh
 galaxy [resource] [command] [flags]
 
-galaxy planets list-all-data --bearer-auth "$BEARER_AUTH" --limit '10' --offset '0'
+galaxy planets list --bearer-auth "$BEARER_AUTH" --limit '10' --offset '0'
 ```
 
 Every command accepts the global flags below, so the examples that follow show only what is specific to them.
