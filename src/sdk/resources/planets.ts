@@ -13,22 +13,22 @@ export class Planets extends APIResource {
   /**
    * It's easy to say you know them all, but do you really? Retrieve all the planets and check whether you missed one.
    *
-   * @param {PlanetListAllDataParams} [query] - The parameters to send with the request.
+   * @param {PlanetListParams} [query] - The parameters to send with the request.
    * @param {RequestOptions} [options] - Options to apply to the request, such as headers and an abort signal.
-   * @returns {APIPromise<PlanetListAllDataResponse>} OK
+   * @returns {APIPromise<PlanetListResponse>} OK
    *
    * @example
    * ```ts
-   * const planet = await client.planets.listAllData({
+   * const planet = await client.planets.list({
    *   limit: 10,
    *   offset: 0,
    * });
    * ```
    */
-  listAllData(
-    query: PlanetListAllDataParams | null | undefined = {},
+  list(
+    query: PlanetListParams | null | undefined = {},
     options?: RequestOptions,
-  ): APIPromise<PlanetListAllDataResponse> {
+  ): APIPromise<PlanetListResponse> {
     return this._client.get('/planets', { query, ...options });
   }
 
@@ -108,20 +108,20 @@ export class Planets extends APIResource {
    * Got a crazy good photo of a planet? Share it with the world!
    *
    * @param {number} planetID - The ID of the planet to get
-   * @param {PlanetDelteImageParams} [body] - The request body to send.
+   * @param {PlanetUploadImageParams} [body] - The request body to send.
    * @param {RequestOptions} [options] - Options to apply to the request, such as headers and an abort signal.
-   * @returns {APIPromise<PlanetDelteImageResponse>} Image uploaded
+   * @returns {APIPromise<PlanetUploadImageResponse>} Image uploaded
    *
    * @example
    * ```ts
-   * const planet = await client.planets.delteImage(1);
+   * const planet = await client.planets.uploadImage(1);
    * ```
    */
-  delteImage(
+  uploadImage(
     planetID: number,
-    body: PlanetDelteImageParams | null | undefined = {},
+    body: PlanetUploadImageParams | null | undefined = {},
     options?: RequestOptions,
-  ): APIPromise<PlanetDelteImageResponse> {
+  ): APIPromise<PlanetUploadImageResponse> {
     return this._client.post(
       __scalarPath`/planets/${planetID}/image`,
       multipartFormRequestOptions({ body, ...options }, this._client),
@@ -231,7 +231,7 @@ export namespace Planet {
   }
 }
 
-export interface PlanetListAllDataParams {
+export interface PlanetListParams {
   /**
    * The number of items to return
    * @default 10
@@ -246,12 +246,12 @@ export interface PlanetListAllDataParams {
   offset?: number;
 }
 
-export interface PlanetListAllDataResponse {
+export interface PlanetListResponse {
   data?: Array<unknown>;
-  meta?: PlanetListAllDataResponse.Meta;
+  meta?: PlanetListResponse.Meta;
 }
 
-export namespace PlanetListAllDataResponse {
+export namespace PlanetListResponse {
   export interface Meta {
     /**
      * @format int64
@@ -475,7 +475,7 @@ export namespace PlanetUpdateParams {
   }
 }
 
-export interface PlanetDelteImageParams {
+export interface PlanetUploadImageParams {
   /**
    * The image file to upload
    * @format binary
@@ -483,7 +483,7 @@ export interface PlanetDelteImageParams {
   image?: Uploadable;
 }
 
-export interface PlanetDelteImageResponse {
+export interface PlanetUploadImageResponse {
   message?: string;
   /**
    * The URL where the uploaded image can be accessed
@@ -506,11 +506,11 @@ export interface PlanetDelteImageResponse {
 export declare namespace Planets {
   export {
     type Planet as Planet,
-    type PlanetListAllDataResponse as PlanetListAllDataResponse,
-    type PlanetDelteImageResponse as PlanetDelteImageResponse,
-    type PlanetListAllDataParams as PlanetListAllDataParams,
+    type PlanetListResponse as PlanetListResponse,
+    type PlanetUploadImageResponse as PlanetUploadImageResponse,
+    type PlanetListParams as PlanetListParams,
     type PlanetCreateParams as PlanetCreateParams,
     type PlanetUpdateParams as PlanetUpdateParams,
-    type PlanetDelteImageParams as PlanetDelteImageParams,
+    type PlanetUploadImageParams as PlanetUploadImageParams,
   };
 }
