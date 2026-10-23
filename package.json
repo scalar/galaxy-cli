@@ -1,6 +1,6 @@
 {
   "name": "@scalar/galaxy-cli",
-  "version": "0.3.2",
+  "version": "0.4.0",
   "description": "The Scalar Galaxy is an example OpenAPI document to test OpenAPI tools and libraries. It's a fictional universe with fictional planets and fictional data.",
   "author": "Scalar Galaxy",
   "repository": {
@@ -33,12 +33,12 @@
     "./man/galaxy.1",
     "./man/galaxy-login.1",
     "./man/galaxy-logout.1",
-    "./man/galaxy-planets-list-all-data.1",
+    "./man/galaxy-planets-list.1",
     "./man/galaxy-planets-create.1",
     "./man/galaxy-planets-retrieve.1",
     "./man/galaxy-planets-update.1",
     "./man/galaxy-planets-delete.1",
-    "./man/galaxy-planets-delte-image.1",
+    "./man/galaxy-planets-upload-image.1",
     "./man/galaxy-celestial-bodies-create.1",
     "./man/galaxy-authentication-create-user.1",
     "./man/galaxy-authentication-create-token.1",

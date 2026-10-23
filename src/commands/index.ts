@@ -90,8 +90,8 @@ const clientOptions = [
 const commands = [
   {
     resourcePath: ['planets'],
-    commandPath: ['planets', 'list-all-data'],
-    methodName: 'listAllData',
+    commandPath: ['planets', 'list'],
+    methodName: 'list',
     summary: 'Get all planets',
     description:
       "It's easy to say you know them all, but do you really? Retrieve all the planets and check whether you missed one.",
@@ -662,8 +662,8 @@ const commands = [
   },
   {
     resourcePath: ['planets'],
-    commandPath: ['planets', 'delte-image'],
-    methodName: 'delteImage',
+    commandPath: ['planets', 'upload-image'],
+    methodName: 'uploadImage',
     summary: 'Upload an image to a planet',
     description: 'Got a crazy good photo of a planet? Share it with the world!',
     transport: 'http',
@@ -972,7 +972,7 @@ export const getProgram = (): Command =>
   createProgram({
     SDK,
     binaryName: 'galaxy',
-    version: '0.3.2', // x-release-please-version
+    version: '0.4.0', // x-release-please-version
     description: 'CLI for Scalar Galaxy',
     defaultFormat: 'auto',
     defaultErrorFormat: 'auto',
