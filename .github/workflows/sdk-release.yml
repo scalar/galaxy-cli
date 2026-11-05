@@ -315,6 +315,14 @@ jobs:
             esac
           done
           rm -rf compile-out
+          cp install.sh release-binaries/install.sh
+          # One checksum file covering every archive, so anything that downloads one can verify what it
+          # fetched before running it — `upgrade` refuses to replace the executable without it. Run from
+          # inside the directory so each line names the bare asset file name, which is the name the
+          # download URL ends in, rather than `release-binaries/…`; the `sed` then strips the `./` that
+          # globbing leaves on each name. `checksums.txt` does not end up checksumming itself: the shell
+          # expands the `./*` glob before it performs the redirection that creates the file.
+          (cd release-binaries && sha256sum ./* > checksums.txt && sed -i 's| \./| |' checksums.txt)
       - name: Attach binaries to the release
         run: gh release upload "v${PKG_VERSION}" release-binaries/* --clobber
         env:
