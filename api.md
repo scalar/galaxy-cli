@@ -27,7 +27,7 @@ Everything about planets
 It's easy to say you know them all, but do you really? Retrieve all the planets and check whether you missed one.
 
 ```sh
-galaxy planets list-all-data --bearer-auth "$BEARER_AUTH" --limit '10' --offset '0'
+galaxy planets list --bearer-auth "$BEARER_AUTH" --limit '10' --offset '0'
 ```
 
 ### Create a planet
@@ -67,7 +67,7 @@ galaxy planets delete '1' --bearer-auth "$BEARER_AUTH"
 Got a crazy good photo of a planet? Share it with the world!
 
 ```sh
-galaxy planets delte-image '1' --bearer-auth "$BEARER_AUTH"
+galaxy planets upload-image '1' --bearer-auth "$BEARER_AUTH"
 ```
 
 ## `CelestialBodies`

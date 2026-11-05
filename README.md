@@ -15,6 +15,7 @@ The full API of this library can be found in [api.md](./api.md).
 - [Environments](#environments)
 - [File Arguments](#file-arguments)
 - [Shell Completion](#shell-completion)
+- [Upgrading](#upgrading)
 - [Manual Pages](#manual-pages)
 - [Authentication](#authentication)
 - [Errors](#errors)
@@ -29,6 +30,10 @@ The full API of this library can be found in [api.md](./api.md).
 ## Installation
 
 ```sh
+# Install script — standalone binary for macOS and Linux, no Node.js required
+curl -fsSL https://github.com/scalar/galaxy-cli/releases/latest/download/install.sh | bash
+# Installs into ~/.local/bin and puts it on PATH; set GALAXY_INSTALL_DIR to choose another directory
+
 # npm (requires Node.js)
 npm install -g @scalar/galaxy-cli
 
@@ -51,7 +56,7 @@ sudo mv galaxy /usr/local/bin/
 ```sh
 galaxy [resource] [command] [flags]
 
-galaxy planets list-all-data --bearer-auth "$BEARER_AUTH" --limit '10' --offset '0'
+galaxy planets list --bearer-auth "$BEARER_AUTH" --limit '10' --offset '0'
 ```
 
 Every command accepts the global flags below, so the examples that follow show only what is specific to them.
@@ -116,6 +121,20 @@ eval "$(galaxy completion zsh)"
 
 # fish (~/.config/fish/config.fish)
 galaxy completion fish | source
+```
+
+<br />
+
+## Upgrading
+
+`galaxy upgrade` installs the latest release. When galaxy was installed through a package manager — Homebrew or npm — it runs that manager's own upgrade instead of replacing files the manager owns. An install made by the install script is replaced in place, with no `sudo`; running the script again does the same. `galaxy upgrade --check` reports the latest version without installing it, and `galaxy uninstall` says how to remove this installation. galaxy also checks for a newer release at most once a day, and mentions it on stderr when one exists. The check is skipped entirely when output is redirected, when `CI` is set, and under `sudo`; set `GALAXY_NO_UPDATE_NOTIFIER` or `NO_UPDATE_NOTIFIER` to turn it off everywhere.
+
+```sh
+galaxy upgrade --check
+galaxy upgrade
+
+# Never contact GitHub to check for a newer release
+export GALAXY_NO_UPDATE_NOTIFIER=1
 ```
 
 <br />

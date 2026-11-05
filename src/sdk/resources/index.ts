@@ -3,12 +3,12 @@
 export { Planets } from './planets';
 export type {
   Planet,
-  PlanetListAllDataParams,
-  PlanetListAllDataResponse,
+  PlanetListParams,
+  PlanetListResponse,
   PlanetCreateParams,
   PlanetUpdateParams,
-  PlanetDelteImageParams,
-  PlanetDelteImageResponse,
+  PlanetUploadImageParams,
+  PlanetUploadImageResponse,
 } from './planets';
 export { CelestialBodies } from './celestial-bodies';
 export type { CelestialBody, CelestialBodyCreateParams } from './celestial-bodies';

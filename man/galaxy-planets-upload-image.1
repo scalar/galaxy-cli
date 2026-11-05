@@ -1,19 +1,20 @@
 .\" File generated from our OpenAPI spec by Scalar. Do not edit.
-.TH "GALAXY\-PLANETS\-LIST\-ALL\-DATA" "1" "" "galaxy" "Scalar Galaxy Manual"
+.TH "GALAXY\-PLANETS\-UPLOAD\-IMAGE" "1" "" "galaxy" "Scalar Galaxy Manual"
 .SH "NAME"
-galaxy\-planets\-list\-all\-data \- Get all planets
+galaxy\-planets\-upload\-image \- Upload an image to a planet
 .SH "SYNOPSIS"
-.B galaxy planets list\-all\-data
-[\fIoptions\fR]
+.B galaxy planets upload\-image
+\fIplanet\-id\fR [\fIoptions\fR]
 .SH "DESCRIPTION"
-It's easy to say you know them all, but do you really? Retrieve all the planets and check whether you missed one.
+Got a crazy good photo of a planet? Share it with the world!
+.SH "ARGUMENTS"
+.TP
+\fIplanet\-id\fR, \fB\-\-planet\-id\fR \fI<value>\fR
+The ID of the planet to get. Required. Can also be supplied as \-\-planet\-id.
 .SH "OPTIONS"
 .TP
-\fB\-\-limit\fR \fI<number>\fR
-The number of items to return.
-.TP
-\fB\-\-offset\fR \fI<number>\fR
-The number of items to skip before starting to collect the result set.
+\fB\-\-image\fR \fI<path>\fR
+The image file to upload.
 .TP
 \fB\-\-base\-url\fR \fI<url>\fR
 Override the base URL for API requests.
@@ -72,7 +73,7 @@ OpenID Connect Authentication. Can also be set with the SCALAR_OPEN_ID_CONNECT e
 .PP
 .RS 4
 .nf
-galaxy planets list\-all\-data \-\-bearer\-auth "$BEARER_AUTH" \-\-limit '10' \-\-offset '0'
+galaxy planets upload\-image '1' \-\-bearer\-auth "$BEARER_AUTH"
 .fi
 .RE
 .SH "ENVIRONMENT"

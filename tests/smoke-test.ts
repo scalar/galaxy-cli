@@ -38,10 +38,10 @@ type SmokeResult = {
 // list is generated, so it stays in sync with the CLI command surface.
 const cases: { operation: string; method: string; path: string; label?: string; args: string[] }[] = [
   {
-    operation: 'listAllData',
+    operation: 'list',
     method: 'GET',
     path: '/planets',
-    args: ['planets', 'list-all-data', '--limit', '10', '--offset', '0'],
+    args: ['planets', 'list', '--limit', '10', '--offset', '0'],
   },
 
   {
@@ -150,19 +150,19 @@ const cases: { operation: string; method: string; path: string; label?: string; 
   },
 
   {
-    operation: 'delteImage',
+    operation: 'uploadImage',
     method: 'POST',
     path: '/planets/{planetId}/image',
     label: 'required params',
-    args: ['planets', 'delte-image', '1'],
+    args: ['planets', 'upload-image', '1'],
   },
 
   {
-    operation: 'delteImage',
+    operation: 'uploadImage',
     method: 'POST',
     path: '/planets/{planetId}/image',
     label: 'all params',
-    args: ['planets', 'delte-image', '1', '--image', '__scalar_smoke_file__'],
+    args: ['planets', 'upload-image', '1', '--image', '__scalar_smoke_file__'],
   },
 
   {
