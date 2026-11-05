@@ -69,6 +69,13 @@ export type CliCommandDefinition = {
   readonly iterable: boolean;
   readonly callShape: 'options' | 'params' | 'body';
   readonly authClientKeyRequirements: readonly (readonly string[])[];
+  // Set when the groups are one per scheme because the document records no requirement: every
+  // credential present is sent. Absent, a credential outside the group the request picks is
+  // withheld where it would overwrite one inside it, or wherever it lands with `authSendsSelected`.
+  readonly authSendsEvery?: true;
+  // Set when the client sends only the alternative it selects: every credential outside the one
+  // picked here is withheld, wherever it lands, so the client selects the same one.
+  readonly authSendsSelected?: true;
   // Param key of a body blob that is forwarded bare or spread into params, depending on callShape.
   readonly bodyParamKey?: string;
   readonly positional: readonly CliFlagDefinition[];
@@ -88,6 +95,8 @@ export type CliClientOptionDefinition = {
   readonly env?: string;
   readonly description?: string;
   readonly auth: boolean;
+  // Where a credential lands (`header:<name>`, `query:<name>`, `cookie:<name>`); credentials only.
+  readonly authLocation?: string;
   // Documented in --help only. Deliberately NOT registered as a Commander default: a default
   // would make the flag always look explicitly set, and the forwarded value would shadow the
   // environment variable the SDK reads before falling back to this same default itself.
@@ -136,6 +145,10 @@ export type CreateProgramOptions = {
   readonly environmentEnv?: string;
   readonly baseUrlEnv?: string;
   readonly auth?: CliAuthDefinition;
+  // Registers `upgrade`/`uninstall`. Absent when no channel publishes a standalone executable, so
+  // a CLI with nothing to upgrade to registers neither. The daily update check is deliberately
+  // not here: it belongs to running the CLI, not to building its program (see `checkForUpdates`).
+  readonly addUpgradeCommands?: (program: Command, binaryName: string, version: string) => void;
 };
 
 type OutputOptions = {
@@ -179,6 +192,7 @@ export const createProgram = ({
   environmentEnv,
   baseUrlEnv,
   auth,
+  addUpgradeCommands,
 }: CreateProgramOptions): Command => {
   const selection: EnvironmentSelection = { environments, defaultEnvironment, environmentEnv, baseUrlEnv };
   const program = usageExitCode(new Command());
@@ -223,6 +237,7 @@ export const createProgram = ({
 
   if (completions) addCompletionCommand(program, binaryName, completions);
   if (auth) addAuthCommands(program, auth, selection);
+  if (addUpgradeCommands) addUpgradeCommands(program, binaryName, version);
 
   return program;
 };
@@ -834,6 +849,7 @@ const sdkClientOptions = async (
     // structured decoding below it: an SDK client option is always a scalar.
     forwarded[option.sdkKey] = typeof value === 'string' ? clientOptionValue(value, option) : value;
   }
+  const typed = new Set(Object.keys(forwarded));
   await applyStoredCredentials(
     forwarded,
     clientOptions,
@@ -842,6 +858,7 @@ const sdkClientOptions = async (
     options.baseUrl,
     environment,
   );
+  withholdOtherCredentials(forwarded, typed, clientOptions, definition);
   return {
     ...(options.baseUrl?.trim() ? { baseURL: options.baseUrl.trim() } : {}),
     ...(environment !== undefined ? { environment, baseURL: null } : {}),
@@ -868,7 +885,7 @@ const applyStoredCredentials = async (
   if (!auth) return;
   if (authClientKeyRequirements.length === 0) return;
   const hasExplicitValue = (option: CliClientOptionDefinition): boolean =>
-    forwarded[option.sdkKey] !== undefined || Boolean(option.env && (process.env[option.env] ?? '').trim());
+    suppliedByCaller(forwarded, option);
   const explicit = authClientKeyRequirements.find((keys) =>
     keys.every((key) => {
       const option = clientOptions.find((candidate) => candidate.clientKey === key);
@@ -894,6 +911,45 @@ const applyStoredCredentials = async (
     if (!Object.prototype.hasOwnProperty.call(stored, option.clientKey)) continue;
     const value = stored[option.clientKey];
     if (typeof value === 'string' && value) forwarded[option.sdkKey] = value;
+  }
+};
+
+// Whether a flag (already forwarded) or a non-blank environment variable supplies this option.
+const suppliedByCaller = (forwarded: Record<string, unknown>, option: CliClientOptionDefinition): boolean =>
+  forwarded[option.sdkKey] !== undefined || Boolean(option.env && (process.env[option.env] ?? '').trim());
+
+// Withholds the credentials outside the security alternative this request satisfies: those that would
+// overwrite one inside it, or every one when the client sends only the alternative it selects.
+const withholdOtherCredentials = (
+  forwarded: Record<string, unknown>,
+  typed: ReadonlySet<string>,
+  clientOptions: readonly CliClientOptionDefinition[],
+  definition: CliCommandDefinition,
+): void => {
+  if (definition.authSendsEvery) return;
+  if (definition.transport === 'websocket') return;
+  const supplied = (key: string): boolean => {
+    const option = clientOptions.find((candidate) => candidate.clientKey === key);
+    return option !== undefined && suppliedByCaller(forwarded, option);
+  };
+  const fromFlags = (key: string): boolean => {
+    const option = clientOptions.find((candidate) => candidate.clientKey === key);
+    return option !== undefined && typed.has(option.sdkKey);
+  };
+  const selected =
+    definition.authClientKeyRequirements.find((keys) => keys.every(fromFlags)) ??
+    definition.authClientKeyRequirements.find((keys) => keys.every(supplied) && keys.some(fromFlags)) ??
+    definition.authClientKeyRequirements.find((keys) => keys.every(supplied));
+  if (!selected) return;
+  const taken = new Set(
+    clientOptions.flatMap((option) =>
+      selected.includes(option.clientKey) && option.authLocation ? [option.authLocation] : [],
+    ),
+  );
+  for (const option of clientOptions) {
+    if (!option.auth || selected.includes(option.clientKey)) continue;
+    if (definition.authSendsSelected || (option.authLocation && taken.has(option.authLocation)))
+      forwarded[option.sdkKey] = null;
   }
 };
 
@@ -1297,7 +1353,8 @@ const coerceValue = (
 // marker honest about what follows, and leaves every other format untouched.
 const streamItemText = (value: unknown, options: OutputOptions): string => {
   if (options.format !== 'toon') return serializeOutput(value, options);
-  if (options.rawOutput && typeof value === 'string') return value;
+  if (options.rawOutput && typeof value === 'string')
+    return processStdout.isTTY ? stripControls(value) : value;
   return serializeOutput([value], options);
 };
 
@@ -1423,17 +1480,45 @@ const collectIterable = async (value: AsyncIterable<unknown>, maxItems?: number)
 // human-readable card view, matching common CLI defaults.
 const serializeOutput = (value: unknown, options: OutputOptions): string => {
   const normalized = options.format === 'auto' ? 'json' : options.format;
-  if (options.rawOutput && typeof value === 'string') return value;
+  const tty = Boolean(processStdout.isTTY);
+  if (options.rawOutput && typeof value === 'string') return tty ? stripControls(value) : value;
   const safeValue = value === undefined ? null : value;
-  if (normalized === 'raw') return typeof safeValue === 'string' ? safeValue : JSON.stringify(safeValue);
-  if (normalized === 'yaml') return stringifyYaml(JSON.parse(JSON.stringify(safeValue))).trimEnd();
-  if (normalized === 'jsonl') return JSON.stringify(safeValue);
+  if (normalized === 'raw' && typeof safeValue === 'string')
+    return tty ? stripControls(safeValue) : safeValue;
   if (normalized === 'pretty') return prettyCard(safeValue, options);
+  const text = serializeData(safeValue, normalized);
+  return tty ? escapeControls(text) : text;
+};
+
+/** The machine-readable formats, which a pipe receives byte for byte. */
+const serializeData = (value: unknown, format: OutputFormat): string => {
+  if (format === 'raw' || format === 'jsonl') return JSON.stringify(value);
+  if (format === 'yaml') return stringifyYaml(JSON.parse(JSON.stringify(value))).trimEnd();
   // TOON keeps the JSON data model but drops repeated syntax, so a list response costs an agent
   // markedly fewer context tokens than the same data as JSON.
-  if (normalized === 'toon') return encodeToon(JSON.parse(JSON.stringify(safeValue)));
-  return JSON.stringify(safeValue, null, 2);
+  if (format === 'toon') return encodeToon(JSON.parse(JSON.stringify(value)));
+  return JSON.stringify(value, null, 2);
 };
+
+// Server-supplied text reaching a terminal can carry commands: ESC and U+009B (a one-character
+// CSI) start sequences that recolour, move the cursor, retitle the window or overwrite earlier
+// output. `JSON.stringify` escapes C0 but passes C1 and DEL through, and YAML quotes but keeps
+// them, so text bound for a terminal is cleaned here. Tab, newline and a CRLF line ending are
+// layout, not commands; a lone CR is not, since it returns the cursor to overwrite the line.
+// A pipe or file still gets the exact bytes, which is what a script reading the output needs; only
+// the `pretty` card, laid out for a person, is cleaned wherever it goes.
+// biome-ignore lint/suspicious/noControlCharactersInRegex: matching them is the point.
+const TERMINAL_CONTROLS = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f]|\r(?!\n)/gu;
+
+/** Replaces every terminal control character in free text, for output a person reads. */
+const stripControls = (text: string): string => text.replace(TERMINAL_CONTROLS, '\ufffd');
+
+/**
+ * Writes every control character a serializer left raw as a `\uXXXX` escape. In JSON and YAML
+ * they can only sit inside quoted strings, where that escape is valid syntax for the same text.
+ */
+const escapeControls = (text: string): string =>
+  text.replace(TERMINAL_CONTROLS, (char) => '\\u' + char.charCodeAt(0).toString(16).padStart(4, '0'));
 
 // Human-readable `pretty` view: a bordered key/value card titled with the command path,
 // rendering booleans as yes/no and array entries as numbered items.
@@ -1460,19 +1545,24 @@ const prettyLines = (value: unknown, indent: string): string[] => {
   if (value && typeof value === 'object') {
     return Object.entries(value as Record<string, unknown>).flatMap(([key, entry]) => {
       if (entry && typeof entry === 'object')
-        return [indent + key + ':', ...prettyLines(entry, indent + '  ')];
-      return [indent + key + ': ' + prettyScalar(entry)];
+        return [indent + cardText(key) + ':', ...prettyLines(entry, indent + '  ')];
+      return [indent + cardText(key) + ': ' + prettyScalar(entry)];
     });
   }
   return [indent + prettyScalar(value)];
 };
 
+// The card is laid out line by line, so a value or key keeps no control character at all: a
+// newline would break the frame as surely as an escape sequence would rewrite it.
 const prettyScalar = (value: unknown): string => {
   if (value === true) return 'yes';
   if (value === false) return 'no';
   if (value === null || value === undefined) return '';
-  return String(value);
+  return cardText(String(value));
 };
+
+/** Text for one line of the pretty card: every control character, tab and newline included, removed. */
+const cardText = (text: string): string => stripControls(text).replace(/\r?\n|\t/gu, ' ');
 
 const writeError = async (
   error: unknown,
@@ -1482,20 +1572,24 @@ const writeError = async (
   environment: string | undefined,
 ): Promise<void> => {
   const body = transformValue(errorBody(error, clientOptions, SDK, environment), options.transform);
+  // An error body is the server's text too, so a terminal gets it cleaned like any other output.
+  const tty = Boolean(process.stderr.isTTY);
   if (options.rawOutput && typeof body === 'string') {
-    process.stderr.write(body + '\n');
+    process.stderr.write((tty ? stripControls(body) : body) + '\n');
     return;
   }
   if (options.format === 'raw') {
     // The hint is appended rather than dropped: before failures were classified, the auth hint
     // *was* the message, so printing the message alone would lose advice `raw` used to show.
     const hint = errorHintText(body);
-    process.stderr.write(String(errorMessage(body)) + (hint ? ' ' + hint : '') + '\n');
+    const message = String(errorMessage(body)) + (hint ? ' ' + hint : '');
+    process.stderr.write((tty ? stripControls(message) : message) + '\n');
     return;
   }
   const output = options.format === 'auto' ? 'pretty' : options.format;
   const safeBody = body === undefined ? null : body;
-  const serialized = serializeErrorBody(safeBody, output);
+  const raw = serializeErrorBody(safeBody, output);
+  const serialized = tty ? escapeControls(raw) : raw;
   process.stderr.write((output === 'pretty' ? as.red(serialized) : serialized) + '\n');
 };
 

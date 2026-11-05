@@ -20,7 +20,7 @@ import {
   warn,
   writeProfile,
 } from './credentials';
-import { windowsPowerShell } from './keychain';
+import { resolveOnPath, windowsPowerShell } from './keychain';
 import { clip, listRow } from './list';
 
 /** Which API an OAuth token is for. Mirrors the emitter's `CliOauthTargetDefinition`. */
@@ -2014,11 +2014,13 @@ const listen = (server: ReturnType<typeof createServer>, port: number): Promise<
  */
 const openBrowser = (url: string): void => {
   const windows = process.platform === 'win32';
+  // Resolved through the absolute `PATH` entries only, as the keychain helper is, so a relative
+  // entry cannot put a planted opener in front of the real one.
+  const opener = windows ? undefined : resolveOnPath(process.platform === 'darwin' ? 'open' : 'xdg-open');
+  if (!windows && !opener) return;
   const [file, ...args] = windows
     ? [windowsPowerShell(), '-NoProfile', '-NonInteractive', '-Command', '-']
-    : process.platform === 'darwin'
-      ? ['open', url]
-      : ['xdg-open', url];
+    : [opener, url];
   try {
     const child = spawn(file as string, args, {
       stdio: windows ? ['pipe', 'ignore', 'ignore'] : 'ignore',

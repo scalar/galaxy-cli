@@ -7,6 +7,10 @@
     "type": "git",
     "url": "git+https://github.com/scalar/galaxy-cli.git"
   },
+  "bugs": {
+    "url": "https://github.com/scalar/galaxy-cli/issues"
+  },
+  "homepage": "https://github.com/scalar/galaxy-cli",
   "type": "module",
   "bin": {
     "galaxy": "./dist/esm/bin.js"
@@ -44,7 +48,9 @@
     "./man/galaxy-authentication-create-token.1",
     "./man/galaxy-authentication-list-me.1",
     "./man/galaxy-environments.1",
-    "./man/galaxy-completion.1"
+    "./man/galaxy-completion.1",
+    "./man/galaxy-upgrade.1",
+    "./man/galaxy-uninstall.1"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json && tsc -p tsconfig.cjs.json && node scripts/finalize-build.mjs",
@@ -53,8 +59,7 @@
   "dependencies": {
     "ansis": "^4.3.0",
     "commander": "^14.0.3",
-    "yaml": "^2.9.0",
-    "standardwebhooks": "^1.0.0"
+    "yaml": "^2.9.0"
   },
   "devDependencies": {
     "@types/node": "^20.17.0",
