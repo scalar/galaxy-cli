@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.4.0](https://github.com/scalar/galaxy-cli/compare/v0.3.2...v0.4.0) (2026-11-05)
+
+
+### ⚠ BREAKING CHANGES
+
+* **api:** 2 breaking changes to the SDK surface.
+    - Response of `planets.list` changed from `paginated_resource` to an unnamed `application/json` body.
+    - Removed schema `paginated_resource`.
+* **api:** 5 breaking changes to the SDK surface.
+    - Removed operation `planets.listAllData` (`GET /planets`).
+    - Removed operation `planets.delteImage` (`POST /planets/{planetId}/image`).
+    - Removed schema `ListAllDataResponseHeaders`.
+    - Removed schema `DelteImageResponseHeaders`.
+    - Removed schema `DelteImageStatus400ResponseHeaders`.
+
+### Features
+
+* **api:** remove operation planets.listAllData (+9 more changes) ([4cc78c1](https://github.com/scalar/galaxy-cli/commit/4cc78c12273c27492e4de41bb87960a7b16e5856))
+* **api:** update response of planets.list (+2 more changes) ([1461677](https://github.com/scalar/galaxy-cli/commit/146167719813729e24fe102dfee75257cd6ee91b))
+
+
+### Chores
+
+* **api:** regenerate SDK ([0c5920e](https://github.com/scalar/galaxy-cli/commit/0c5920e82183da79885667388432b6fce11e3acb))
+
 ## [0.3.2](https://github.com/scalar/galaxy-cli/compare/v0.3.1...v0.3.2) (2026-10-07)
 
 
