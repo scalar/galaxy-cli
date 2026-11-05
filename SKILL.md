@@ -10,6 +10,10 @@ Generated CLI client for Scalar Galaxy API, published as `@scalar/galaxy-cli`. U
 ## Install
 
 ```sh
+# Install script — standalone binary for macOS and Linux, no Node.js required
+curl -fsSL https://github.com/scalar/galaxy-cli/releases/latest/download/install.sh | bash
+# Installs into ~/.local/bin and puts it on PATH; set GALAXY_INSTALL_DIR to choose another directory
+
 # npm (requires Node.js)
 npm install -g @scalar/galaxy-cli
 

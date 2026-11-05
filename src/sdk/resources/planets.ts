@@ -247,7 +247,7 @@ export interface PlanetListParams {
 }
 
 export interface PlanetListResponse {
-  data?: Array<unknown>;
+  data?: Array<Planet>;
   meta?: PlanetListResponse.Meta;
 }
 
