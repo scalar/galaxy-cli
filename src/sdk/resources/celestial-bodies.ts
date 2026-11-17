@@ -49,7 +49,7 @@ export namespace CelestialBody {
   }
 }
 
-export type CelestialBodyCreateParams = PlanetsAPI.Planet | CelestialBodyCreateParams.Satellite;
+export type CelestialBodyCreateParams = PlanetsAPI.PlanetParam | CelestialBodyCreateParams.Satellite;
 
 export declare namespace CelestialBodyCreateParams {
   export interface Satellite {

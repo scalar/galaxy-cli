@@ -187,6 +187,65 @@ jobs:
               fi
               ;;
           esac
+      # Runs before any npm publish, the compile, and the archive upload. The tap token is otherwise
+      # first used by "Update Homebrew tap", the job's last step, where a missing, expired, or revoked
+      # token would fail the release after npm and the GitHub Release assets had already shipped,
+      # leaving `brew install` on the previous version until the job was re-run. The tag and the
+      # GitHub Release already exist either way, so a failure here still leaves a release to publish
+      # again once the secret is fixed, but nothing has shipped that the second attempt has to
+      # reconcile. The errors below say to re-run this job alone: in release-please.yml, re-running
+      # the release-please job too (a whole-run re-run, or "failed jobs" when its back-sync also
+      # failed) finds the release PR already tagged, reports no release created, and skips this job,
+      # so the run goes green with the release still empty. A single-job re-run keeps its outputs.
+      - name: Check Homebrew tap token
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN || secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "$HOMEBREW_TAP_TOKEN" ]; then
+            echo "::error::Homebrew publishing is enabled but the HOMEBREW_TAP_TOKEN (or HOMEBREW_TAP_GITHUB_TOKEN) secret is empty. Store a GitHub token with Contents: read and write on scalar/homebrew-galaxy-cli-tap in it." >&2
+            exit 1
+          fi
+
+          # Asks for the advertisement `git push` opens with. A clone or `git ls-remote` cannot stand
+          # in for it: git sends the token only once the server asks for credentials, and GitHub never
+          # asks to read a public tap, so an expired token reads one without complaint. The push side
+          # always authenticates, and curl sends the token up front, so this answers 401 for a token
+          # GitHub no longer accepts and 403 for one that cannot write to the tap. The token goes in
+          # on stdin rather than as an argument, so it never appears in the process list.
+          #
+          # `--location` follows the redirect GitHub answers a renamed or transferred tap with, as git
+          # does; curl keeps the credentials because the redirect stays on github.com. A transport
+          # failure (DNS, TLS, timeout) makes curl exit non-zero after writing `000`, which `|| true`
+          # keeps from ending the step before it can say what it was checking.
+          STATUS="$(printf 'user = "x-access-token:%s"\n' "$HOMEBREW_TAP_TOKEN" \
+            | curl --silent --show-error --location --retry 3 --connect-timeout 10 --max-time 60 --config - \
+              --output /dev/null --write-out '%{http_code}' \
+              "https://github.com/scalar/homebrew-galaxy-cli-tap.git/info/refs?service=git-receive-pack")" || true
+          case "$STATUS" in
+            200) ;;
+            000)
+              echo "::error::Could not reach GitHub to check the HOMEBREW_TAP_TOKEN (or HOMEBREW_TAP_GITHUB_TOKEN) secret against scalar/homebrew-galaxy-cli-tap. Once GitHub is reachable, re-run this job." >&2
+              exit 1
+              ;;
+            401)
+              echo "::error::GitHub rejected the HOMEBREW_TAP_TOKEN (or HOMEBREW_TAP_GITHUB_TOKEN) secret: the token has expired, been revoked, or is not a GitHub token. Store a new token with Contents: read and write on scalar/homebrew-galaxy-cli-tap, then re-run this job." >&2
+              exit 1
+              ;;
+            403)
+              echo "::error::The HOMEBREW_TAP_TOKEN (or HOMEBREW_TAP_GITHUB_TOKEN) secret cannot push to scalar/homebrew-galaxy-cli-tap. Grant the token Contents: read and write on that repository, then re-run this job." >&2
+              exit 1
+              ;;
+            404)
+              echo "::error::scalar/homebrew-galaxy-cli-tap was not found with the HOMEBREW_TAP_TOKEN (or HOMEBREW_TAP_GITHUB_TOKEN) secret. Check targets.cli.publish.homebrew.tapRepo, and that the token was granted access to that repository." >&2
+              exit 1
+              ;;
+            *)
+              echo "::error::Could not check the HOMEBREW_TAP_TOKEN (or HOMEBREW_TAP_GITHUB_TOKEN) secret against scalar/homebrew-galaxy-cli-tap: GitHub answered HTTP ${STATUS}. If GitHub was having trouble, re-run this job; otherwise check targets.cli.publish.homebrew.tapRepo." >&2
+              exit 1
+              ;;
+          esac
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "24"
@@ -207,7 +266,7 @@ jobs:
       - name: Set up Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          bun-version: "1.4.0"
+          bun-version: "1.4.4"
       # `bun build --compile` embeds the Bun runtime and every dependency in the executable, so the
       # published artifacts run on a machine with no Node, no Bun, and no `node_modules` — unlike the
       # npm package, which stays a normal Node CLI. Bun cross-compiles every target from this one
@@ -235,10 +294,10 @@ jobs:
                 ;;
             esac
           done
-      # The macOS executables are cross-compiled on this Linux runner, and the ad-hoc signature Bun
-      # leaves on them is not one macOS accepts: Apple Silicon refuses to execute a Mach-O whose
-      # signature does not validate, and Gatekeeper blocks a downloaded binary that carries no
-      # Developer ID. Re-signing here, before the archives are packed, fixes both.
+      # The macOS executables are cross-compiled on this Linux runner, and Bun leaves only an ad-hoc
+      # signature on them: Gatekeeper blocks a downloaded binary that carries no Developer ID, and
+      # notarization also needs the hardened runtime. Re-signing here, before the archives are
+      # packed, gives them both.
       #
       # rcodesign reimplements Apple's signing and notarization protocols, so this runs alongside the
       # compile on one Linux runner; `codesign` and `notarytool` are macOS-only and would have split
@@ -343,8 +402,8 @@ jobs:
               --for-notarization \
               "compile-out/${target}/galaxy"
           done
-          # Signing alone only makes the binary runnable; Gatekeeper still blocks it on download
-          # until Apple has notarized it. The notary service accepts an archive rather than a bare
+          # A Developer ID signature alone is not enough; Gatekeeper still blocks the binary on
+          # download until Apple has notarized it. The notary service accepts an archive rather than a bare
           # executable, and a ticket cannot be stapled onto a bare Mach-O in any case, so both
           # architectures are submitted together in one zip: Apple records a ticket per code
           # directory hash, and Gatekeeper resolves those online the first time the binary runs.
