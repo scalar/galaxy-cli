@@ -5,10 +5,7 @@ import { fileURLToPath } from 'node:url';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const RELATIVE_SPECIFIER_RE = /(from\s+["']|import\(\s*["'])(\.{1,2}\/[^"']+)(["'])/g;
 
-await Promise.all([
-  rewriteRelativeSpecifiers(resolve(root, 'dist/esm')),
-  markCommonJsOutput(resolve(root, 'dist/cjs')),
-]);
+await rewriteRelativeSpecifiers(resolve(root, 'dist/esm'));
 await chmod(resolve(root, 'dist/esm/bin.js'), 0o755).catch(() => {});
 
 async function rewriteRelativeSpecifiers(dir) {
@@ -32,16 +29,6 @@ async function rewriteRelativeSpecifiers(dir) {
       await writeFile(path, source.replace(RELATIVE_SPECIFIER_RE, addJsExtension), 'utf8');
     }),
   );
-}
-
-async function markCommonJsOutput(dir) {
-  try {
-    await readdir(dir);
-    await writeFile(resolve(dir, 'package.json'), '{\n  "type": "commonjs"\n}\n', 'utf8');
-  } catch (error) {
-    if (error && error.code === 'ENOENT') return;
-    throw error;
-  }
 }
 
 function addJsExtension(match, prefix, specifier, suffix) {

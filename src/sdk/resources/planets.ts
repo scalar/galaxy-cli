@@ -13,22 +13,22 @@ export class Planets extends APIResource {
   /**
    * It's easy to say you know them all, but do you really? Retrieve all the planets and check whether you missed one.
    *
-   * @param {PlanetListAllDataParams} [query] - The parameters to send with the request.
+   * @param {PlanetListParams} [query] - The parameters to send with the request.
    * @param {RequestOptions} [options] - Options to apply to the request, such as headers and an abort signal.
-   * @returns {APIPromise<PlanetListAllDataResponse>} OK
+   * @returns {APIPromise<PlanetListResponse>} OK
    *
    * @example
    * ```ts
-   * const planet = await client.planets.listAllData({
+   * const planet = await client.planets.list({
    *   limit: 10,
    *   offset: 0,
    * });
    * ```
    */
-  listAllData(
-    query: PlanetListAllDataParams | null | undefined = {},
+  list(
+    query: PlanetListParams | null | undefined = {},
     options?: RequestOptions,
-  ): APIPromise<PlanetListAllDataResponse> {
+  ): APIPromise<PlanetListResponse> {
     return this._client.get('/planets', { query, ...options });
   }
 
@@ -108,20 +108,20 @@ export class Planets extends APIResource {
    * Got a crazy good photo of a planet? Share it with the world!
    *
    * @param {number} planetID - The ID of the planet to get
-   * @param {PlanetDelteImageParams} [body] - The request body to send.
+   * @param {PlanetUploadImageParams} [body] - The request body to send.
    * @param {RequestOptions} [options] - Options to apply to the request, such as headers and an abort signal.
-   * @returns {APIPromise<PlanetDelteImageResponse>} Image uploaded
+   * @returns {APIPromise<PlanetUploadImageResponse>} Image uploaded
    *
    * @example
    * ```ts
-   * const planet = await client.planets.delteImage(1);
+   * const planet = await client.planets.uploadImage(1);
    * ```
    */
-  delteImage(
+  uploadImage(
     planetID: number,
-    body: PlanetDelteImageParams | null | undefined = {},
+    body: PlanetUploadImageParams | null | undefined = {},
     options?: RequestOptions,
-  ): APIPromise<PlanetDelteImageResponse> {
+  ): APIPromise<PlanetUploadImageResponse> {
     return this._client.post(
       __scalarPath`/planets/${planetID}/image`,
       multipartFormRequestOptions({ body, ...options }, this._client),
@@ -231,7 +231,103 @@ export namespace Planet {
   }
 }
 
-export interface PlanetListAllDataParams {
+/**
+ * A planet in the Scalar Galaxy
+ *
+ * The request shape of `Planet`: fields the server sets (`readOnly`) are left out, except a discriminator the schema declares, and write-only fields are included.
+ */
+export interface PlanetParam {
+  name: string;
+  description?: string | null;
+  type?: 'terrestrial' | 'gas_giant' | 'ice_giant' | 'dwarf' | 'super_earth';
+  /**
+   * A score from 0 to 1 indicating potential habitability
+   * @format float
+   * @minimum 0
+   * @maximum 1
+   */
+  habitabilityIndex?: number;
+  physicalProperties?: PlanetParam.PhysicalProperties;
+  /**
+   * Atmospheric composition
+   */
+  atmosphere?: Array<PlanetParam.Atmosphere>;
+  /**
+   * @format date-time
+   */
+  discoveredAt?: string;
+  image?: string | null;
+  satellites?: Array<unknown>;
+  /**
+   * A user
+   */
+  creator?: AuthenticationAPI.UserParam;
+  tags?: Array<string>;
+  /**
+   * URL which gets invoked upon a successful operation
+   * @format uri
+   */
+  successCallbackUrl?: string;
+  /**
+   * URL which gets invoked upon a failed operation
+   * @format uri
+   */
+  failureCallbackUrl?: string;
+}
+
+export namespace PlanetParam {
+  export interface PhysicalProperties {
+    /**
+     * Mass in Earth masses (must be greater than 0)
+     * @format float
+     * @exclusiveMinimum 0
+     */
+    mass?: number;
+    /**
+     * Radius in Earth radii (must be greater than 0)
+     * @format float
+     * @exclusiveMinimum 0
+     */
+    radius?: number;
+    /**
+     * Surface gravity in Earth g
+     * @format float
+     */
+    gravity?: number;
+    temperature?: PhysicalProperties.Temperature;
+  }
+
+  export namespace PhysicalProperties {
+    export interface Temperature {
+      /**
+       * Minimum temperature in Kelvin
+       * @format float
+       */
+      min?: number;
+      /**
+       * Maximum temperature in Kelvin
+       * @format float
+       */
+      max?: number;
+      /**
+       * Average temperature in Kelvin
+       * @format float
+       */
+      average?: number;
+    }
+  }
+
+  export interface Atmosphere {
+    compound?: string;
+    /**
+     * @format float
+     * @exclusiveMaximum 100
+     */
+    percentage?: number;
+  }
+}
+
+export interface PlanetListParams {
   /**
    * The number of items to return
    * @default 10
@@ -246,12 +342,12 @@ export interface PlanetListAllDataParams {
   offset?: number;
 }
 
-export interface PlanetListAllDataResponse {
-  data?: Array<unknown>;
-  meta?: PlanetListAllDataResponse.Meta;
+export interface PlanetListResponse {
+  data?: Array<Planet>;
+  meta?: PlanetListResponse.Meta;
 }
 
-export namespace PlanetListAllDataResponse {
+export namespace PlanetListResponse {
   export interface Meta {
     /**
      * @format int64
@@ -294,7 +390,7 @@ export interface PlanetCreateParams {
   /**
    * A user
    */
-  creator?: AuthenticationAPI.User;
+  creator?: AuthenticationAPI.UserParam;
   tags?: Array<string>;
   /**
    * URL which gets invoked upon a successful operation
@@ -397,7 +493,7 @@ export interface PlanetUpdateParams {
   /**
    * A user
    */
-  creator?: AuthenticationAPI.User;
+  creator?: AuthenticationAPI.UserParam;
   tags?: Array<string>;
   /**
    * URL which gets invoked upon a successful operation
@@ -475,7 +571,7 @@ export namespace PlanetUpdateParams {
   }
 }
 
-export interface PlanetDelteImageParams {
+export interface PlanetUploadImageParams {
   /**
    * The image file to upload
    * @format binary
@@ -483,7 +579,7 @@ export interface PlanetDelteImageParams {
   image?: Uploadable;
 }
 
-export interface PlanetDelteImageResponse {
+export interface PlanetUploadImageResponse {
   message?: string;
   /**
    * The URL where the uploaded image can be accessed
@@ -506,11 +602,12 @@ export interface PlanetDelteImageResponse {
 export declare namespace Planets {
   export {
     type Planet as Planet,
-    type PlanetListAllDataResponse as PlanetListAllDataResponse,
-    type PlanetDelteImageResponse as PlanetDelteImageResponse,
-    type PlanetListAllDataParams as PlanetListAllDataParams,
+    type PlanetParam as PlanetParam,
+    type PlanetListResponse as PlanetListResponse,
+    type PlanetUploadImageResponse as PlanetUploadImageResponse,
+    type PlanetListParams as PlanetListParams,
     type PlanetCreateParams as PlanetCreateParams,
     type PlanetUpdateParams as PlanetUpdateParams,
-    type PlanetDelteImageParams as PlanetDelteImageParams,
+    type PlanetUploadImageParams as PlanetUploadImageParams,
   };
 }
