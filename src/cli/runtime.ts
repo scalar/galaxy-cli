@@ -4,10 +4,11 @@ import { accessSync, constants as fsConstants, createReadStream, readFileSync } 
 import { stdin as processStdin, stdout as processStdout } from 'node:process';
 
 import as from 'ansis';
-import { Command } from 'commander';
+import { Command, Option } from 'commander';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 
 import { listRow } from './list';
+import { setNoInput } from './prompt';
 import { encodeToon } from './toon.js';
 import { takeWarnings } from './credentials';
 import { type CliAuthDefinition, UsageError, runLogin, runLogout, storedCredentials } from './login';
@@ -145,9 +146,10 @@ export type CreateProgramOptions = {
   readonly environmentEnv?: string;
   readonly baseUrlEnv?: string;
   readonly auth?: CliAuthDefinition;
-  // Registers `upgrade`/`uninstall`. Absent when no channel publishes a standalone executable, so
-  // a CLI with nothing to upgrade to registers neither. The daily update check is deliberately
-  // not here: it belongs to running the CLI, not to building its program (see `checkForUpdates`).
+  // Registers `upgrade`/`uninstall`. Absent when no channel publishes the npm package or a
+  // standalone executable, so a CLI with nothing to upgrade to registers neither. The daily update
+  // check is deliberately not here: it belongs to running the CLI, not to building its program
+  // (see `checkForUpdates`).
   readonly addUpgradeCommands?: (program: Command, binaryName: string, version: string) => void;
 };
 
@@ -173,6 +175,7 @@ type GlobalOptions = {
   readonly transformError?: string;
   readonly rawOutput?: boolean;
   readonly debug?: boolean;
+  readonly noInput?: boolean;
   readonly maxItems?: string;
 };
 
@@ -214,7 +217,12 @@ export const createProgram = ({
     .option('--transform <path>', 'Dot-path transform for data output')
     .option('--transform-error <path>', 'Dot-path transform for error output')
     .option('-r, --raw-output', 'Print transformed string values without JSON quotes')
-    .option('--debug', 'Enable SDK debug logging');
+    .option('--debug', 'Enable SDK debug logging')
+    .addOption(noInputOption());
+
+  program.hook('preAction', (_program, actionCommand) => {
+    setNoInput(actionCommand.optsWithGlobals<GlobalOptions>().noInput === true);
+  });
 
   // Registered only for an API that declares more than one environment, because that is when the
   // embedded SDK accepts an `environment` option at all. No Commander default is set: the SDK
@@ -499,6 +507,7 @@ const addAuthCommands = (
     .showHelpAfterError()
     .option('--base-url <url>', 'Sign in against this base URL instead of the default')
     .option('--flow <name>', 'Sign-in flow to use: ' + flows)
+    .addOption(noInputOption())
     .addHelpText('after', authFlowHelp(auth))
     .action(async (_options: unknown, command: Command) => {
       const options = command.optsWithGlobals<GlobalOptions & { flow?: string }>();
@@ -580,6 +589,14 @@ const credentialBaseUrl = (
 const authFlowHelp = (auth: CliAuthDefinition): string =>
   '\nSign-in flows:\n' + auth.methods.map((method) => '  ' + method.name + '  ' + method.label).join('\n');
 
+// `--no-input` as a plain switch read as `noInput`, not as Commander's negation of `--input`: a
+// spec param named `input` registers `--input <value>`, and a negation would write `false` into it.
+const noInputOption = (): Option => {
+  const option = new Option('--no-input', 'Never prompt; a command that would ask fails instead');
+  option.negate = false;
+  return option;
+};
+
 const clientOptionDescription = (option: CliClientOptionDefinition): string => {
   const parts: string[] = [];
   if (option.description) parts.push(option.description);
@@ -643,7 +660,8 @@ const addGeneratedCommand = (
     .option('--transform <path>', 'Dot-path transform for data output')
     .option('--transform-error <path>', 'Dot-path transform for error output')
     .option('-r, --raw-output', 'Print transformed string values without JSON quotes')
-    .option('--debug', 'Enable SDK debug logging');
+    .option('--debug', 'Enable SDK debug logging')
+    .addOption(noInputOption());
 
   // Mirrored on the subcommand for the same reason the client options below are: so it can be
   // passed before or after the verb. Registered only when the API declares more than one
@@ -1628,7 +1646,7 @@ const errorBody = (
       status: record.status,
       requestId: record.requestID ?? record.requestId,
       ...(hint !== undefined ? { hint } : {}),
-      body: record.body,
+      body: record.body ?? record.error,
     };
   }
   return { code: 'error', message: String(error) };
@@ -1715,6 +1733,7 @@ const authHint = (
 ): string | undefined => {
   const authOptions = clientOptions.filter((option) => option.auth);
   if (authOptions.length === 0) return undefined;
+  const flags = authOptions.map((option) => '--' + option.name).join(', ');
   const env = authOptions
     .map((option) => option.env)
     .filter((value): value is string => !!value)
@@ -1722,7 +1741,8 @@ const authHint = (
   return (
     'Authentication failed. Run `' +
     loginCommandFor(environment) +
-    '`' +
+    '`, pass ' +
+    flags +
     (env ? ', or set ' + env : '') +
     ', and try again.'
   );

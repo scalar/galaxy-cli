@@ -318,15 +318,6 @@ const commands = [
         valueKind: 'object',
       },
       {
-        name: 'creator.id',
-        optionKey: 'creator.id',
-        paramKey: 'creator',
-        location: 'body',
-        required: false,
-        valueKind: 'integer',
-        objectPath: ['id'],
-      },
-      {
         name: 'creator.name',
         optionKey: 'creator.name',
         paramKey: 'creator',
@@ -586,15 +577,6 @@ const commands = [
         required: false,
         description: 'A user',
         valueKind: 'object',
-      },
-      {
-        name: 'creator.id',
-        optionKey: 'creator.id',
-        paramKey: 'creator',
-        location: 'body',
-        required: false,
-        valueKind: 'integer',
-        objectPath: ['id'],
       },
       {
         name: 'creator.name',

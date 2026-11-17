@@ -32,6 +32,7 @@ import { VERSION } from './version';
 import {
   Planets,
   type Planet,
+  type PlanetParam,
   type PlanetListResponse,
   type PlanetUploadImageResponse,
   type PlanetListParams,
@@ -47,6 +48,7 @@ import {
 import {
   Authentication,
   type User,
+  type UserParam,
   type Credentials,
   type AuthenticationCreateTokenResponse,
   type AuthenticationCreateUserParams,
@@ -557,7 +559,8 @@ export class Galaxy {
       // A redirect the SDK refused to follow fails the same way on every attempt, so it is not retried.
       if (isRefusedRedirect(response)) throw response;
       const retryMessage = `retrying, ${retriesRemaining} attempts remaining`;
-      if (options.signal?.aborted) {
+      // The signal the request was sent with, so an aborted `fetchOptions.signal` reads as a cancel too.
+      if (req.signal?.aborted) {
         throw new Errors.APIUserAbortError();
       }
       // detect native connection timeout errors
@@ -580,7 +583,7 @@ export class Galaxy {
             message: response.message,
           }),
         );
-        return this.retryRequest(options, retriesRemaining, retryOfRequestLogID ?? requestLogID);
+        return this.retryRequest(options, retriesRemaining, retryOfRequestLogID ?? requestLogID, req.signal);
       }
       loggerFor(this).info(
         `[${requestLogID}] connection ${isTimeout ? 'timed out' : 'failed'} - error; no more retries left`,
@@ -627,6 +630,7 @@ export class Galaxy {
           options,
           retriesRemaining,
           retryOfRequestLogID ?? requestLogID,
+          req.signal,
           response.headers,
         );
       }
@@ -891,6 +895,7 @@ export class Galaxy {
     options: FinalRequestOptions,
     retriesRemaining: number,
     requestLogID: string,
+    signal: RequestInit['signal'],
     responseHeaders?: Headers | undefined,
   ): Promise<APIResponseProps> {
     let timeoutMillis: number | undefined;
@@ -930,7 +935,11 @@ export class Galaxy {
       const maxRetries = options.maxRetries ?? this.maxRetries;
       timeoutMillis = this.calculateDefaultRetryTimeoutMillis(retriesRemaining, maxRetries);
     }
-    await sleep(timeoutMillis);
+    // Cancelling during the backoff ends the call now, rather than after the delay and one more request.
+    await sleep(timeoutMillis, signal);
+    if (signal?.aborted) {
+      throw new Errors.APIUserAbortError();
+    }
 
     return this.makeRequest(options, retriesRemaining - 1, requestLogID);
   }
@@ -979,13 +988,14 @@ export class Galaxy {
     const req: FinalizedRequestInit = {
       method,
       headers: reqHeaders,
-      ...(options.signal && { signal: options.signal }),
       ...((globalThis as any).ReadableStream &&
         body instanceof (globalThis as any).ReadableStream && { duplex: 'half' }),
       // `buildBody` already collapses no-body into `undefined`; here we only need to drop that
       // sentinel. A truthiness spread would also strip an intentional empty-string body.
       ...(body !== undefined && { body }),
       ...((this.fetchOptions as any) ?? {}),
+      // The call's own signal beats the client's `fetchOptions.signal`; the call's `fetchOptions` beats both.
+      ...(options.signal && { signal: options.signal }),
       ...((options.fetchOptions as any) ?? {}),
     };
     return { req, url, timeout: options.timeout };
@@ -1266,6 +1276,7 @@ export declare namespace Galaxy {
   export {
     Planets as Planets,
     type Planet as Planet,
+    type PlanetParam as PlanetParam,
     type PlanetListResponse as PlanetListResponse,
     type PlanetUploadImageResponse as PlanetUploadImageResponse,
     type PlanetListParams as PlanetListParams,
@@ -1283,6 +1294,7 @@ export declare namespace Galaxy {
   export {
     Authentication as Authentication,
     type User as User,
+    type UserParam as UserParam,
     type Credentials as Credentials,
     type AuthenticationCreateTokenResponse as AuthenticationCreateTokenResponse,
     type AuthenticationCreateUserParams as AuthenticationCreateUserParams,
