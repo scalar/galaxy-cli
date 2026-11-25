@@ -15,6 +15,7 @@ The full API of this library can be found in [api.md](./api.md).
 - [Environments](#environments)
 - [File Arguments](#file-arguments)
 - [Shell Completion](#shell-completion)
+- [Upgrading](#upgrading)
 - [Manual Pages](#manual-pages)
 - [Authentication](#authentication)
 - [Errors](#errors)
@@ -29,6 +30,10 @@ The full API of this library can be found in [api.md](./api.md).
 ## Installation
 
 ```sh
+# Install script — standalone binary for macOS and Linux, no Node.js required
+curl -fsSL https://github.com/scalar/galaxy-cli/releases/latest/download/install.sh | bash
+# Installs into ~/.local/bin and puts it on PATH; set GALAXY_INSTALL_DIR to choose another directory
+
 # npm (requires Node.js)
 npm install -g @scalar/galaxy-cli
 
@@ -51,7 +56,7 @@ sudo mv galaxy /usr/local/bin/
 ```sh
 galaxy [resource] [command] [flags]
 
-galaxy planets list-all-data --bearer-auth "$BEARER_AUTH" --limit '10' --offset '0'
+galaxy planets list --bearer-auth "$BEARER_AUTH" --limit '10' --offset '0'
 ```
 
 Every command accepts the global flags below, so the examples that follow show only what is specific to them.
@@ -92,13 +97,17 @@ galaxy --environment production COMMAND
 
 ## File Arguments
 
-Any command flag or credential reads its value from a file when the value begins with `@`, so a body field holding a whole document does not have to survive shell quoting. `@file://` always sends the file as text and `@data://` always sends it base64-encoded; a bare `@` lets the file decide. A flag that uploads a file takes its path with or without the `@`. Escape a literal value that begins with `@` as `\@`. The global options (`--base-url`, `--timeout`, `--format` and the rest) are read exactly as written.
+Any command flag or credential reads its value from a file when the value begins with `@`, so a body field holding a whole document does not have to survive shell quoting. `@file://` always sends the file as text and `@data://` always sends it base64-encoded; a bare `@` lets the file decide. A flag that uploads a file takes its path with or without the `@`. Escape a literal value that begins with `@` as `\@`. The global options (`--base-url`, `--timeout`, `--format` and the rest) are read exactly as written. Object-array flags accept a JSON object per occurrence or a whole JSON array. Repeated arrays and objects concatenate in order. A file may contain either form. Pipe a bare JSON array on stdin for a whole-array body, or a JSON object keyed by input names for other inputs. Explicit flags override stdin. Required inputs are checked after merging, before any request. Automatic stdin detection waits up to 25 ms for the first bytes, then reads through EOF. Pass `--stdin` to wait for a delayed producer. An open pipe with no input otherwise counts as absent. For a required object body with only optional properties, `{}` explicitly supplies an empty body; stdin containing only query/header inputs also supplies an empty body. Optional bodies remain absent when stdin contains only query/header inputs.
 
 ```sh
 galaxy COMMAND --FLAG @./body.json
 galaxy COMMAND --FLAG @file://./notes.txt
 galaxy COMMAND --FLAG @data://./logo.png
 galaxy COMMAND --FLAG '\@not-a-file'
+galaxy COMMAND --OBJECT_ARRAY_FLAG '[{"id":"a"},{"id":"b"}]'
+galaxy COMMAND --OBJECT_ARRAY_FLAG '{"id":"a"}' --OBJECT_ARRAY_FLAG '{"id":"b"}'
+cat ./body.json | galaxy COMMAND
+cat ./body.json | galaxy COMMAND --stdin
 ```
 
 <br />
@@ -116,6 +125,20 @@ eval "$(galaxy completion zsh)"
 
 # fish (~/.config/fish/config.fish)
 galaxy completion fish | source
+```
+
+<br />
+
+## Upgrading
+
+`galaxy upgrade` installs the latest release. When galaxy was installed through a package manager — Homebrew or npm — it runs that manager's own upgrade instead of replacing files the manager owns. An install made by the install script is replaced in place, with no `sudo`; running the script again does the same. `galaxy upgrade --check` reports the latest version without installing it, and `galaxy uninstall` says how to remove this installation. galaxy also checks the npm registry for an npm install, and GitHub Releases for a standalone executable for a newer release at most once a day, and mentions it on stderr when one exists. An npm install is compared against `npm_config_registry` (or `NPM_CONFIG_REGISTRY`) when that is set, and registry.npmjs.org otherwise; `.npmrc` is not read, so export one of these to use a mirror. The notice names the global install command of the client that installed it. An `npx`, `bunx` or `pnpm dlx` run has nothing installed to upgrade. The check is skipped entirely when output is redirected, when `CI` is set, and under `sudo`; set `GALAXY_NO_UPDATE_NOTIFIER` or `NO_UPDATE_NOTIFIER` to turn it off everywhere.
+
+```sh
+galaxy upgrade --check
+galaxy upgrade
+
+# Never check for a newer release
+export GALAXY_NO_UPDATE_NOTIFIER=1
 ```
 
 <br />
@@ -160,7 +183,7 @@ Declared schemes:
 
 ## Errors
 
-Failed requests print a structured error to standard error and exit with a status that identifies the failure class. The error body carries the API's own `message` plus a stable `code`, the HTTP `status`, the `requestId`, and — where one applies — an actionable `hint`. Usage errors (exit `2`) are reported as a plain message instead, since no request was made. Exit statuses: `0` success, `1` `error`, `2` `usage`, `10` `auth-failed`, `11` `not-found`, `12` `rate-limited`, `13` `client-error`, `14` `server-error`, `15` `connection-error`.
+Failed requests print a structured error to standard error and exit with a status that identifies the failure class. The error body carries the API's own `message` plus a stable `code`, the HTTP `status`, the `requestId`, and — where one applies — an actionable `hint`. When the API answered with a JSON error payload, its parsed form is under `body`, so structured details such as an API-specific error code or field errors can be read without parsing `message`. Usage errors (exit `2`) are reported as a plain message instead, since no request was made. Exit statuses: `0` success, `1` `error`, `2` `usage`, `10` `auth-failed`, `11` `not-found`, `12` `rate-limited`, `13` `client-error`, `14` `server-error`, `15` `connection-error`.
 
 Documented error statuses: `400`, `401`, `403`, `404`, `409`, `422`, `429`.
 
@@ -176,6 +199,7 @@ Configure the generated client by setting any of these options when you create i
 | `--timeout` | `<ms>` | - | Request timeout in milliseconds. |
 | `--max-retries` | `<count>` | - | Number of retries for retryable failures. |
 | `--debug` | `flag` | - | Enable SDK debug logging. |
+| `--stdin` | `flag` | - | Read JSON/YAML from stdin through EOF, waiting for delayed input. |
 | `--environment` | `<name>` | `production` | Named environment to target: production, void (can also be set with SCALAR_ENVIRONMENT env var). Cannot be combined with `--base-url`. |
 
 <br />
@@ -190,10 +214,12 @@ Generated clients support request timeouts and retry temporary failures such as 
 
 - `--format <format>` — output format: `auto`, `json`, `jsonl`, `pretty`, `raw`, `toon`, or `yaml`.
 - `--format-error <format>` — error output format: `auto`, `json`, `jsonl`, `pretty`, `raw`, `toon`, or `yaml`.
+- `--format pretty` — output for reading in a terminal: a list of objects as a table with a column per field, its widest columns cut to fit the terminal, and anything else as a key/value card whose values wrap to fit. A list that only fits by cutting a column below ten characters prints as the card too. Cards stay unwrapped and table columns stay uncut when output is redirected.
 - `--format toon` — token-efficient structured output for AI agents; uniform lists collapse into one header plus a row per item, with a definitive item count.
 - `--transform <path>` and `--transform-error <path>` — dot-path transform for data/error output.
 - `--raw-output`, `-r` — print transformed string values without JSON quotes.
 - `--max-items <count>` — bound iterator, streaming, and WebSocket command output.
+- `--no-input` — never prompt: a command that would ask fails instead, the same as it does without a terminal.
 - Errors carry a stable `code` and an actionable `hint` beside the API's own message, and each failure class exits with its own status: `1` `error`, `2` `usage`, `10` `auth-failed`, `11` `not-found`, `12` `rate-limited`, `13` `client-error`, `14` `server-error`, `15` `connection-error`.
 
 <br />

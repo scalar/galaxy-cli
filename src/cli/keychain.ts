@@ -1,6 +1,30 @@
 // File generated from our OpenAPI spec by Scalar. See README.md for details.
 
 import { spawnSync } from 'node:child_process';
+import { accessSync, constants as fsConstants, statSync } from 'node:fs';
+import { delimiter, isAbsolute, join } from 'node:path';
+
+/**
+ * The absolute path of the executable `name` on `PATH`, or `undefined` when there is none.
+ *
+ * Only absolute `PATH` entries are searched. An empty entry stands for the current directory and a
+ * relative one is resolved against it, so letting the system search them would let a checked-out
+ * repository supply a `secret-tool` of its own — which is then handed the profile's secret. The
+ * spawn gets the absolute path this returns, never the bare name.
+ */
+export const resolveOnPath = (name: string): string | undefined => {
+  for (const dir of (process.env['PATH'] ?? '').split(delimiter)) {
+    if (!dir || !isAbsolute(dir)) continue;
+    const candidate = join(dir, name);
+    try {
+      accessSync(candidate, fsConstants.X_OK);
+      if (statSync(candidate).isFile()) return candidate;
+    } catch {
+      // Not here, or not executable; the next entry may have it.
+    }
+  }
+  return undefined;
+};
 
 /**
  * One platform's credential helper, as the three commands this needs from it.
@@ -79,8 +103,9 @@ export const windowsPowerShell = (): string =>
  */
 const HELPERS: Readonly<Record<string, KeychainHelper>> = {
   // Linux: the freedesktop Secret Service, which GNOME Keyring and KWallet both implement.
-  // Spawned by bare name only because Linux has no fixed place for it, so whatever comes first on
-  // `PATH` answers; Windows and macOS, which do have one, use an absolute path.
+  // Linux has no fixed place for it, so whatever comes first on `PATH` answers — but `run`
+  // resolves it to an absolute path through the absolute `PATH` entries alone (see
+  // {@link resolveOnPath}); Windows and macOS, which do have a fixed place, use it directly.
   linux: {
     file: 'secret-tool',
     lookup: (service, account) => ['lookup', 'service', service, 'account', account],
@@ -267,6 +292,10 @@ const run = (
 ): { readonly ok: boolean; readonly stdout: string; readonly unavailable: boolean } => {
   const helper = HELPERS[process.platform];
   if (!helper) return { ok: false, stdout: '', unavailable: true };
+  // Missing from every absolute `PATH` entry is the same as missing: the fallback, not a bare-name
+  // spawn that would search the relative entries this skipped.
+  const file = isAbsolute(helper.file) ? helper.file : resolveOnPath(helper.file);
+  if (!file) return { ok: false, stdout: '', unavailable: true };
   const script = helper.script?.(mode);
   // A scripted helper consumes the whole of standard input as its script, so its secret travels in
   // the environment beside the service and account; a direct helper takes the secret on stdin, and
@@ -274,7 +303,7 @@ const run = (
   const input = helper.input ? helper.input(mode, service, account, secret) : (script ?? secret ?? '');
   if (input === undefined) return { ok: false, stdout: '', unavailable: false };
   try {
-    const result = spawnSync(helper.file, [...helper[mode](service, account)], {
+    const result = spawnSync(file, [...helper[mode](service, account)], {
       input,
       encoding: 'utf8',
       // A helper that blocks — a locked keychain putting up a dialog, a Secret Service with no

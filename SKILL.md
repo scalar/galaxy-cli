@@ -10,6 +10,10 @@ Generated CLI client for Scalar Galaxy API, published as `@scalar/galaxy-cli`. U
 ## Install
 
 ```sh
+# Install script — standalone binary for macOS and Linux, no Node.js required
+curl -fsSL https://github.com/scalar/galaxy-cli/releases/latest/download/install.sh | bash
+# Installs into ~/.local/bin and puts it on PATH; set GALAXY_INSTALL_DIR to choose another directory
+
 # npm (requires Node.js)
 npm install -g @scalar/galaxy-cli
 
@@ -43,14 +47,14 @@ Provide credentials using the options below. Environment variables are read auto
 ```sh
 galaxy [resource] [command] [flags]
 
-galaxy planets list-all-data --bearer-auth "$BEARER_AUTH" --limit '10' --offset '0'
+galaxy planets list --bearer-auth "$BEARER_AUTH" --limit '10' --offset '0'
 ```
 
 Method names, parameter shapes, and response types are generated from the API description — do not guess them. Look up the exact call signature in [api.md](./api.md) before writing a call.
 
 ## Error handling
 
-Failed requests print a structured error to standard error and exit with a status that identifies the failure class. The error body carries the API's own `message` plus a stable `code`, the HTTP `status`, the `requestId`, and — where one applies — an actionable `hint`. Usage errors (exit `2`) are reported as a plain message instead, since no request was made. Exit statuses: `0` success, `1` `error`, `2` `usage`, `10` `auth-failed`, `11` `not-found`, `12` `rate-limited`, `13` `client-error`, `14` `server-error`, `15` `connection-error`.
+Failed requests print a structured error to standard error and exit with a status that identifies the failure class. The error body carries the API's own `message` plus a stable `code`, the HTTP `status`, the `requestId`, and — where one applies — an actionable `hint`. When the API answered with a JSON error payload, its parsed form is under `body`, so structured details such as an API-specific error code or field errors can be read without parsing `message`. Usage errors (exit `2`) are reported as a plain message instead, since no request was made. Exit statuses: `0` success, `1` `error`, `2` `usage`, `10` `auth-failed`, `11` `not-found`, `12` `rate-limited`, `13` `client-error`, `14` `server-error`, `15` `connection-error`.
 
 ## Working with this SDK programmatically
 

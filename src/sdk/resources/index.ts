@@ -3,18 +3,20 @@
 export { Planets } from './planets';
 export type {
   Planet,
-  PlanetListAllDataParams,
-  PlanetListAllDataResponse,
+  PlanetParam,
+  PlanetListParams,
+  PlanetListResponse,
   PlanetCreateParams,
   PlanetUpdateParams,
-  PlanetDelteImageParams,
-  PlanetDelteImageResponse,
+  PlanetUploadImageParams,
+  PlanetUploadImageResponse,
 } from './planets';
 export { CelestialBodies } from './celestial-bodies';
 export type { CelestialBody, CelestialBodyCreateParams } from './celestial-bodies';
 export { Authentication } from './authentication';
 export type {
   User,
+  UserParam,
   Credentials,
   AuthenticationCreateUserParams,
   AuthenticationCreateTokenParams,

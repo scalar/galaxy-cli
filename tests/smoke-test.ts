@@ -36,12 +36,19 @@ type SmokeResult = {
 // absent when the command has no optional flag and so has only one case. `args` is the argv
 // passed to the built CLI; the other fields are metadata used for filtering and reporting. This
 // list is generated, so it stays in sync with the CLI command surface.
-const cases: { operation: string; method: string; path: string; label?: string; args: string[] }[] = [
+const cases: {
+  operation: string;
+  method: string;
+  path: string;
+  label?: string;
+  args: string[];
+  input?: string;
+}[] = [
   {
-    operation: 'listAllData',
+    operation: 'list',
     method: 'GET',
     path: '/planets',
-    args: ['planets', 'list-all-data', '--limit', '10', '--offset', '0'],
+    args: ['planets', 'list', '--limit', '10', '--offset', '0'],
   },
 
   {
@@ -150,19 +157,19 @@ const cases: { operation: string; method: string; path: string; label?: string; 
   },
 
   {
-    operation: 'delteImage',
+    operation: 'uploadImage',
     method: 'POST',
     path: '/planets/{planetId}/image',
     label: 'required params',
-    args: ['planets', 'delte-image', '1'],
+    args: ['planets', 'upload-image', '1'],
   },
 
   {
-    operation: 'delteImage',
+    operation: 'uploadImage',
     method: 'POST',
     path: '/planets/{planetId}/image',
     label: 'all params',
-    args: ['planets', 'delte-image', '1', '--image', '__scalar_smoke_file__'],
+    args: ['planets', 'upload-image', '1', '--image', '__scalar_smoke_file__'],
   },
 
   {
@@ -170,6 +177,7 @@ const cases: { operation: string; method: string; path: string; label?: string; 
     method: 'POST',
     path: '/celestial-bodies',
     args: ['celestial-bodies', 'create'],
+    input: '{}',
   },
 
   {
@@ -300,11 +308,13 @@ const main = async (): Promise<void> => {
         const args = testCase.args.map((arg) =>
           arg === '__scalar_smoke_file__' && smokeFilePath ? smokeFilePath : arg,
         );
-        await execFileAsync('node', [binPath, ...args], {
+        const execution = execFileAsync('node', [binPath, ...args], {
           env: process.env,
           timeout: COMMAND_TIMEOUT_MS,
           maxBuffer: 1024 * 1024 * 20,
         });
+        execution.child.stdin?.end(testCase.input ?? '');
+        await execution;
         results[index] = { ...identity, status: 'passed', durationMs: Date.now() - startedAt };
       } catch (error) {
         // Surface stderr (commander/runtime error output) when present; fall back to the message.

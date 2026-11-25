@@ -11,6 +11,7 @@ import {
 } from '../cli/runtime';
 import { completions } from '../cli/completions';
 import type { CliAuthDefinition } from '../cli/login';
+import { addUpgradeCommands, notifyIfOutdated } from '../cli/upgrade';
 
 const clientOptions = [
   {
@@ -21,6 +22,7 @@ const clientOptions = [
     env: 'BEARER_AUTH',
     description: 'JWT Bearer token authentication',
     auth: true,
+    authLocation: 'header:authorization',
   },
   {
     clientKey: 'basicAuthUsername',
@@ -30,6 +32,7 @@ const clientOptions = [
     env: 'BASIC_AUTH_USERNAME',
     description: 'Basic HTTP authentication',
     auth: true,
+    authLocation: 'header:authorization',
   },
   {
     clientKey: 'basicAuthPassword',
@@ -39,6 +42,7 @@ const clientOptions = [
     env: 'BASIC_AUTH_PASSWORD',
     description: 'Basic HTTP authentication',
     auth: true,
+    authLocation: 'header:authorization',
   },
   {
     clientKey: 'apiKeyHeader',
@@ -48,6 +52,7 @@ const clientOptions = [
     env: 'API_KEY_HEADER',
     description: 'API key request header',
     auth: true,
+    authLocation: 'header:x-api-key',
   },
   {
     clientKey: 'apiKeyQuery',
@@ -57,6 +62,7 @@ const clientOptions = [
     env: 'API_KEY_QUERY',
     description: 'API key query parameter',
     auth: true,
+    authLocation: 'query:api_key',
   },
   {
     clientKey: 'apiKeyCookie',
@@ -66,6 +72,7 @@ const clientOptions = [
     env: 'API_KEY_COOKIE',
     description: 'API key browser cookie',
     auth: true,
+    authLocation: 'cookie:api_key',
   },
   {
     clientKey: 'oAuth2',
@@ -75,6 +82,7 @@ const clientOptions = [
     env: 'SCALAR_O_AUTH2',
     description: 'OAuth 2.0 authentication',
     auth: true,
+    authLocation: 'header:authorization',
   },
   {
     clientKey: 'openIDConnect',
@@ -84,14 +92,15 @@ const clientOptions = [
     env: 'SCALAR_OPEN_ID_CONNECT',
     description: 'OpenID Connect Authentication',
     auth: true,
+    authLocation: 'header:authorization',
   },
 ] as const satisfies readonly CliClientOptionDefinition[];
 
 const commands = [
   {
     resourcePath: ['planets'],
-    commandPath: ['planets', 'list-all-data'],
-    methodName: 'listAllData',
+    commandPath: ['planets', 'list'],
+    methodName: 'list',
     summary: 'Get all planets',
     description:
       "It's easy to say you know them all, but do you really? Retrieve all the planets and check whether you missed one.",
@@ -103,7 +112,6 @@ const commands = [
       ['basicAuthUsername', 'basicAuthPassword'],
       ['apiKeyQuery'],
       ['apiKeyHeader'],
-      ['apiKeyHeader', 'apiKeyQuery'],
       ['apiKeyCookie'],
       ['oAuth2'],
       ['openIDConnect'],
@@ -145,7 +153,6 @@ const commands = [
       ['basicAuthUsername', 'basicAuthPassword'],
       ['apiKeyQuery'],
       ['apiKeyHeader'],
-      ['apiKeyHeader', 'apiKeyQuery'],
       ['apiKeyCookie'],
       ['oAuth2'],
       ['openIDConnect'],
@@ -307,15 +314,6 @@ const commands = [
         required: false,
         description: 'A user',
         valueKind: 'object',
-      },
-      {
-        name: 'creator.id',
-        optionKey: 'creator.id',
-        paramKey: 'creator',
-        location: 'body',
-        required: false,
-        valueKind: 'integer',
-        objectPath: ['id'],
       },
       {
         name: 'creator.name',
@@ -371,7 +369,6 @@ const commands = [
       ['basicAuthUsername', 'basicAuthPassword'],
       ['apiKeyQuery'],
       ['apiKeyHeader'],
-      ['apiKeyHeader', 'apiKeyQuery'],
       ['apiKeyCookie'],
       ['oAuth2'],
       ['openIDConnect'],
@@ -404,7 +401,6 @@ const commands = [
       ['basicAuthUsername', 'basicAuthPassword'],
       ['apiKeyQuery'],
       ['apiKeyHeader'],
-      ['apiKeyHeader', 'apiKeyQuery'],
       ['apiKeyCookie'],
       ['oAuth2'],
       ['openIDConnect'],
@@ -579,15 +575,6 @@ const commands = [
         valueKind: 'object',
       },
       {
-        name: 'creator.id',
-        optionKey: 'creator.id',
-        paramKey: 'creator',
-        location: 'body',
-        required: false,
-        valueKind: 'integer',
-        objectPath: ['id'],
-      },
-      {
         name: 'creator.name',
         optionKey: 'creator.name',
         paramKey: 'creator',
@@ -641,7 +628,6 @@ const commands = [
       ['basicAuthUsername', 'basicAuthPassword'],
       ['apiKeyQuery'],
       ['apiKeyHeader'],
-      ['apiKeyHeader', 'apiKeyQuery'],
       ['apiKeyCookie'],
       ['oAuth2'],
       ['openIDConnect'],
@@ -662,8 +648,8 @@ const commands = [
   },
   {
     resourcePath: ['planets'],
-    commandPath: ['planets', 'delte-image'],
-    methodName: 'delteImage',
+    commandPath: ['planets', 'upload-image'],
+    methodName: 'uploadImage',
     summary: 'Upload an image to a planet',
     description: 'Got a crazy good photo of a planet? Share it with the world!',
     transport: 'http',
@@ -674,7 +660,6 @@ const commands = [
       ['basicAuthUsername', 'basicAuthPassword'],
       ['apiKeyQuery'],
       ['apiKeyHeader'],
-      ['apiKeyHeader', 'apiKeyQuery'],
       ['apiKeyCookie'],
       ['oAuth2'],
       ['openIDConnect'],
@@ -718,11 +703,11 @@ const commands = [
       ['basicAuthUsername', 'basicAuthPassword'],
       ['apiKeyQuery'],
       ['apiKeyHeader'],
-      ['apiKeyHeader', 'apiKeyQuery'],
       ['apiKeyCookie'],
       ['oAuth2'],
       ['openIDConnect'],
     ],
+    bodyRequired: true,
     positional: [],
     flags: [],
   },
@@ -740,7 +725,6 @@ const commands = [
       ['basicAuthUsername', 'basicAuthPassword'],
       ['apiKeyQuery'],
       ['apiKeyHeader'],
-      ['apiKeyHeader', 'apiKeyQuery'],
       ['apiKeyCookie'],
       ['oAuth2'],
       ['openIDConnect'],
@@ -787,7 +771,6 @@ const commands = [
       ['basicAuthUsername', 'basicAuthPassword'],
       ['apiKeyQuery'],
       ['apiKeyHeader'],
-      ['apiKeyHeader', 'apiKeyQuery'],
       ['apiKeyCookie'],
       ['oAuth2'],
       ['openIDConnect'],
@@ -826,7 +809,6 @@ const commands = [
       ['basicAuthUsername', 'basicAuthPassword'],
       ['apiKeyQuery'],
       ['apiKeyHeader'],
-      ['apiKeyHeader', 'apiKeyQuery'],
       ['apiKeyCookie'],
       ['oAuth2'],
       ['openIDConnect'],
@@ -887,7 +869,6 @@ const auth = {
     ['basicAuthUsername', 'basicAuthPassword'],
     ['apiKeyQuery'],
     ['apiKeyHeader'],
-    ['apiKeyHeader', 'apiKeyQuery'],
     ['apiKeyCookie'],
     ['oAuth2'],
     ['openIDConnect'],
@@ -972,7 +953,7 @@ export const getProgram = (): Command =>
   createProgram({
     SDK,
     binaryName: 'galaxy',
-    version: '0.3.2', // x-release-please-version
+    version: '0.4.0', // x-release-please-version
     description: 'CLI for Scalar Galaxy',
     defaultFormat: 'auto',
     defaultErrorFormat: 'auto',
@@ -985,4 +966,8 @@ export const getProgram = (): Command =>
     baseUrlEnv: 'SCALAR_BASE_URL',
     completions,
     auth,
+    addUpgradeCommands,
   });
+
+/** Runs the daily update check. Called by `run()` only, so building the program makes no request. */
+export const checkForUpdates = (argv: readonly string[]): void => notifyIfOutdated('galaxy', '0.4.0', argv); // x-release-please-version
