@@ -36,6 +36,9 @@ Print transformed string values without JSON quotes.
 \fB\-\-debug\fR
 Enable SDK debug logging on standard error.
 .TP
+\fB\-\-stdin\fR
+Read JSON/YAML from stdin through EOF, waiting for delayed input.
+.TP
 \fB\-\-no\-input\fR
 Never prompt; a command that would ask fails instead.
 .TP
@@ -69,7 +72,7 @@ OpenID Connect Authentication. Can also be set with the SCALAR_OPEN_ID_CONNECT e
 .PP
 .RS 4
 .nf
-galaxy celestial\-bodies create \-\-bearer\-auth "$BEARER_AUTH"
+printf '%s' '{}' | galaxy celestial\-bodies create \-\-bearer\-auth "$BEARER_AUTH"
 .fi
 .RE
 .SH "ENVIRONMENT"

@@ -46,7 +46,7 @@ Maximum temperature in Kelvin.
 Average temperature in Kelvin.
 .TP
 \fB\-\-atmosphere\fR \fI<value>\fR
-Atmospheric composition. Repeat the flag to pass multiple values.
+Atmospheric composition. Pass one JSON object per occurrence or a whole JSON array; arrays and items concatenate in order. Use @path to read a file, or pipe JSON on stdin.
 .TP
 \fB\-\-discovered\-at\fR \fI<value>\fR
 The discovered\-at body parameter.
@@ -55,7 +55,7 @@ The discovered\-at body parameter.
 The image body parameter.
 .TP
 \fB\-\-satellite\fR \fI<value>\fR
-The satellite body parameter. Repeat the flag to pass multiple values.
+The satellite body parameter. Pass one JSON object per occurrence or a whole JSON array; arrays and items concatenate in order. Use @path to read a file, or pipe JSON on stdin.
 .TP
 \fB\-\-creator\fR \fI<json>\fR
 A user.
@@ -98,6 +98,9 @@ Print transformed string values without JSON quotes.
 .TP
 \fB\-\-debug\fR
 Enable SDK debug logging on standard error.
+.TP
+\fB\-\-stdin\fR
+Read JSON/YAML from stdin through EOF, waiting for delayed input.
 .TP
 \fB\-\-no\-input\fR
 Never prompt; a command that would ask fails instead.
