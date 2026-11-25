@@ -97,13 +97,17 @@ galaxy --environment production COMMAND
 
 ## File Arguments
 
-Any command flag or credential reads its value from a file when the value begins with `@`, so a body field holding a whole document does not have to survive shell quoting. `@file://` always sends the file as text and `@data://` always sends it base64-encoded; a bare `@` lets the file decide. A flag that uploads a file takes its path with or without the `@`. Escape a literal value that begins with `@` as `\@`. The global options (`--base-url`, `--timeout`, `--format` and the rest) are read exactly as written.
+Any command flag or credential reads its value from a file when the value begins with `@`, so a body field holding a whole document does not have to survive shell quoting. `@file://` always sends the file as text and `@data://` always sends it base64-encoded; a bare `@` lets the file decide. A flag that uploads a file takes its path with or without the `@`. Escape a literal value that begins with `@` as `\@`. The global options (`--base-url`, `--timeout`, `--format` and the rest) are read exactly as written. Object-array flags accept a JSON object per occurrence or a whole JSON array. Repeated arrays and objects concatenate in order. A file may contain either form. Pipe a bare JSON array on stdin for a whole-array body, or a JSON object keyed by input names for other inputs. Explicit flags override stdin. Required inputs are checked after merging, before any request. Automatic stdin detection waits up to 25 ms for the first bytes, then reads through EOF. Pass `--stdin` to wait for a delayed producer. An open pipe with no input otherwise counts as absent. For a required object body with only optional properties, `{}` explicitly supplies an empty body; stdin containing only query/header inputs also supplies an empty body. Optional bodies remain absent when stdin contains only query/header inputs.
 
 ```sh
 galaxy COMMAND --FLAG @./body.json
 galaxy COMMAND --FLAG @file://./notes.txt
 galaxy COMMAND --FLAG @data://./logo.png
 galaxy COMMAND --FLAG '\@not-a-file'
+galaxy COMMAND --OBJECT_ARRAY_FLAG '[{"id":"a"},{"id":"b"}]'
+galaxy COMMAND --OBJECT_ARRAY_FLAG '{"id":"a"}' --OBJECT_ARRAY_FLAG '{"id":"b"}'
+cat ./body.json | galaxy COMMAND
+cat ./body.json | galaxy COMMAND --stdin
 ```
 
 <br />
@@ -195,6 +199,7 @@ Configure the generated client by setting any of these options when you create i
 | `--timeout` | `<ms>` | - | Request timeout in milliseconds. |
 | `--max-retries` | `<count>` | - | Number of retries for retryable failures. |
 | `--debug` | `flag` | - | Enable SDK debug logging. |
+| `--stdin` | `flag` | - | Read JSON/YAML from stdin through EOF, waiting for delayed input. |
 | `--environment` | `<name>` | `production` | Named environment to target: production, void (can also be set with SCALAR_ENVIRONMENT env var). Cannot be combined with `--base-url`. |
 
 <br />
@@ -209,6 +214,7 @@ Generated clients support request timeouts and retry temporary failures such as 
 
 - `--format <format>` — output format: `auto`, `json`, `jsonl`, `pretty`, `raw`, `toon`, or `yaml`.
 - `--format-error <format>` — error output format: `auto`, `json`, `jsonl`, `pretty`, `raw`, `toon`, or `yaml`.
+- `--format pretty` — output for reading in a terminal: a list of objects as a table with a column per field, its widest columns cut to fit the terminal, and anything else as a key/value card whose values wrap to fit. A list that only fits by cutting a column below ten characters prints as the card too. Cards stay unwrapped and table columns stay uncut when output is redirected.
 - `--format toon` — token-efficient structured output for AI agents; uniform lists collapse into one header plus a row per item, with a definitive item count.
 - `--transform <path>` and `--transform-error <path>` — dot-path transform for data/error output.
 - `--raw-output`, `-r` — print transformed string values without JSON quotes.

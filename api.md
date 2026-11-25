@@ -79,7 +79,7 @@ Celestial bodies are the planets and satellites in the Scalar Galaxy.
 Stars, moons, comets, the occasional rogue asteroid — if it glows or drifts through the void, you can add it here.
 
 ```sh
-galaxy celestial-bodies create --bearer-auth "$BEARER_AUTH"
+printf '%s' '{}' | galaxy celestial-bodies create --bearer-auth "$BEARER_AUTH"
 ```
 
 ## `Authentication`

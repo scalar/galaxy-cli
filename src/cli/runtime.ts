@@ -7,6 +7,7 @@ import as from 'ansis';
 import { Command, Option } from 'commander';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 
+import { addContextCommand, markCommand, markUnmarkedCommands } from './context.js';
 import { listRow } from './list';
 import { setNoInput } from './prompt';
 import { encodeToon } from './toon.js';
@@ -49,6 +50,8 @@ export type CliFlagDefinition = {
   readonly valueKind: CliValueKind;
   // Array-valued flag accepted as a repeatable singular switch (`--status a --status b`).
   readonly repeatable?: boolean;
+  // A single null value denotes the nullable array itself, not one array item.
+  readonly nullableArray?: true;
   // Value kind of one occurrence of a repeatable flag, so `--tag ''` stays an empty string rather
   // than parsing as YAML `null`, and a string id is not read as a number.
   readonly itemKind?: CliValueKind;
@@ -79,6 +82,8 @@ export type CliCommandDefinition = {
   readonly authSendsSelected?: true;
   // Param key of a body blob that is forwarded bare or spread into params, depending on callShape.
   readonly bodyParamKey?: string;
+  // Required even when every declared body property is optional.
+  readonly bodyRequired?: true;
   readonly positional: readonly CliFlagDefinition[];
   readonly flags: readonly CliFlagDefinition[];
 };
@@ -155,7 +160,7 @@ export type CreateProgramOptions = {
 
 type OutputOptions = {
   readonly format: OutputFormat;
-  // Command path shown above each `pretty` card (e.g. `workers list`).
+  // Command path shown above each `pretty` card or table (e.g. `workers list`).
   readonly title?: string;
   readonly transform?: string;
   readonly rawOutput?: boolean;
@@ -175,6 +180,7 @@ type GlobalOptions = {
   readonly transformError?: string;
   readonly rawOutput?: boolean;
   readonly debug?: boolean;
+  readonly stdin?: boolean;
   readonly noInput?: boolean;
   readonly maxItems?: string;
 };
@@ -218,6 +224,7 @@ export const createProgram = ({
     .option('--transform-error <path>', 'Dot-path transform for error output')
     .option('-r, --raw-output', 'Print transformed string values without JSON quotes')
     .option('--debug', 'Enable SDK debug logging')
+    .option('--stdin', 'Read JSON/YAML from stdin through EOF, waiting for delayed input')
     .addOption(noInputOption());
 
   program.hook('preAction', (_program, actionCommand) => {
@@ -246,6 +253,12 @@ export const createProgram = ({
   if (completions) addCompletionCommand(program, binaryName, completions);
   if (auth) addAuthCommands(program, auth, selection);
   if (addUpgradeCommands) addUpgradeCommands(program, binaryName, version);
+
+  // Everything registered above that `addGeneratedCommand` did not mark is the runtime's own
+  // (`completion`, `login`, `upgrade`, …), and `context` describes it that way. Registered last, so
+  // the hidden `context` command never shadows a name the commands above claimed.
+  markUnmarkedCommands(program, 'builtin');
+  addContextCommand(program, usageExitCode);
 
   return program;
 };
@@ -661,6 +674,7 @@ const addGeneratedCommand = (
     .option('--transform-error <path>', 'Dot-path transform for error output')
     .option('-r, --raw-output', 'Print transformed string values without JSON quotes')
     .option('--debug', 'Enable SDK debug logging')
+    .option('--stdin', 'Read JSON/YAML from stdin through EOF, waiting for delayed input')
     .addOption(noInputOption());
 
   // Mirrored on the subcommand for the same reason the client options below are: so it can be
@@ -686,6 +700,15 @@ const addGeneratedCommand = (
   }
 
   for (const flag of definition.flags) {
+    const description = [
+      flag.description,
+      flag.required ? 'Required.' : undefined,
+      flag.repeatable && flag.itemKind === 'object'
+        ? 'Pass a JSON object per occurrence or a whole JSON array; arrays and items concatenate in order. Use @path to read a file, or pipe JSON on stdin.'
+        : undefined,
+    ]
+      .filter(Boolean)
+      .join(' ');
     // A file flag takes a filesystem path, so it says so: the placeholder is the only hint in
     // `--help` that the value is opened rather than sent verbatim.
     const isPath = flag.valueKind === 'file' || flag.itemKind === 'file';
@@ -693,7 +716,7 @@ const addGeneratedCommand = (
     if (flag.name === 'send') {
       command.option(
         '--' + flag.name + value,
-        flag.description ?? '',
+        description,
         (value: string, previous: string[] | undefined) => [...(previous ?? []), value],
       );
       continue;
@@ -703,12 +726,12 @@ const addGeneratedCommand = (
     if (flag.repeatable) {
       command.option(
         '--' + flag.name + value,
-        flag.description ?? '',
+        description,
         (value: string, previous: string[] | undefined) => [...(previous ?? []), value],
       );
       continue;
     }
-    command.option('--' + flag.name + value, flag.description ?? '');
+    command.option('--' + flag.name + value, description);
   }
 
   // Flag spelling for path params (`--id wkr_1`). `flagName` is absent when the name is already
@@ -729,6 +752,10 @@ const addGeneratedCommand = (
   });
 
   parent.addCommand(command);
+  // Recorded for `context`: the command and every group on its path come from the API description.
+  markCommand(command, { source: 'generated' });
+  for (let group: Command | null = parent; group?.parent; group = group.parent)
+    markCommand(group, { source: 'generated' });
 };
 
 const ensureCommandPath = (
@@ -802,6 +829,39 @@ const runGeneratedCommand = async (
   };
 
   try {
+    const call = await callArguments(
+      definition,
+      command.opts<Record<string, unknown>>(),
+      positionalValues,
+      Boolean(commandOptions.stdin || rootOptions.stdin),
+    );
+
+    // Required positionals are validated here (not by Commander) because each one may also be
+    // supplied through its flag spelling or stdin; `call.params` has all sources merged.
+    for (const param of definition.positional) {
+      if (param.required && !hasInput(call.params, param.paramKey)) {
+        command.error("error: missing required argument '" + param.name + "'", { exitCode: 2 });
+      }
+    }
+    // Flags are checked after merging too: Commander cannot see values supplied on stdin.
+    for (const flag of definition.flags) {
+      if (!flag.required || flag.objectPath || hasInput(call.params, flag.paramKey)) continue;
+      if (flag.location === 'body' && !definition.bodyRequired && !call.bodyPresent) continue;
+      if (flag.paramKey === definition.bodyParamKey && hasInput(call.params, 'body')) continue;
+      command.error(
+        "error: required option '--" +
+          flag.name +
+          (flag.valueKind === 'boolean' ? '' : ' <value>') +
+          "' not specified",
+        { exitCode: 2 },
+      );
+    }
+    if (definition.bodyRequired && !call.bodyPresent) {
+      command.error('error: missing required request body; supply body flags or pipe JSON on stdin', {
+        exitCode: 2,
+      });
+    }
+
     const client = buildClient(
       SDK,
       await sdkClientOptions(rootOptions, command, clientOptions, definition, environment, auth),
@@ -809,16 +869,6 @@ const runGeneratedCommand = async (
       environment,
     );
     const method = sdkMethod(client, definition);
-    const call = await callArguments(definition, command.opts<Record<string, unknown>>(), positionalValues);
-
-    // Required positionals are validated here (not by Commander) because each one may also be
-    // supplied through its flag spelling or stdin; `call.params` has all sources merged.
-    for (const param of definition.positional) {
-      if (param.required && call.params[param.paramKey] === undefined) {
-        command.error("error: missing required argument '" + param.name + "'", { exitCode: 2 });
-      }
-    }
-
     const result = method(...call.args);
 
     if (definition.transport === 'websocket') {
@@ -989,46 +1039,67 @@ const sdkMethod = (
   return method.bind(target) as (...args: unknown[]) => unknown;
 };
 
+/** Inherited names such as constructor are not inputs the caller supplied. */
+const hasInput = (params: Record<string, unknown>, key: string): boolean =>
+  Object.hasOwn(params, key) && params[key] !== undefined;
+
 const callArguments = async (
   definition: CliCommandDefinition,
   options: Record<string, unknown>,
   positionalValues: readonly unknown[],
-): Promise<{ readonly args: readonly unknown[]; readonly params: Record<string, unknown> }> => {
-  const positionalParams: Record<string, unknown> = {};
+  waitForStdin: boolean,
+): Promise<{
+  readonly args: readonly unknown[];
+  readonly params: Record<string, unknown>;
+  readonly bodyPresent: boolean;
+}> => {
+  const positionalParams: Record<string, unknown> = Object.create(null);
   definition.positional.forEach((param, index) => {
     // `optionKey` is only this positional's when it was given a flag spelling. Without one the key
     // belongs to whatever took the name — a `--environment` selector, say — and reading it would
     // fill the path param with that flag's value and satisfy the required-argument check below.
     const value =
-      positionalValues[index] ?? (param.flagName === undefined ? undefined : options[param.optionKey]);
+      positionalValues[index] ??
+      (param.flagName === undefined || !hasInput(options, param.optionKey)
+        ? undefined
+        : options[param.optionKey]);
     if (value !== undefined)
       positionalParams[param.paramKey] = coerceValue(value, param.valueKind, undefined, param.name);
   });
 
-  const flagParams: Record<string, unknown> = {};
+  const flagParams: Record<string, unknown> = Object.create(null);
   for (const flag of definition.flags) {
     if (flag.objectPath) continue;
-    const value = options[flag.optionKey];
+    const value = hasInput(options, flag.optionKey) ? options[flag.optionKey] : undefined;
     if (value !== undefined)
-      flagParams[flag.paramKey] = coerceValue(value, flag.valueKind, flag.itemKind, '--' + flag.name);
+      flagParams[flag.paramKey] = coerceValue(
+        value,
+        flag.valueKind,
+        flag.itemKind,
+        '--' + flag.name,
+        flag.nullableArray,
+      );
   }
 
   // Dotted leaf flags (e.g. `--address.city`) are applied after the JSON-blob flag for the same
   // param so an explicit leaf value always overrides the corresponding blob field.
   for (const flag of definition.flags) {
     if (!flag.objectPath || flag.objectPath.length === 0) continue;
-    const value = options[flag.optionKey];
+    const value = hasInput(options, flag.optionKey) ? options[flag.optionKey] : undefined;
     if (value === undefined) continue;
     flagParams[flag.paramKey] = setNestedValue(
       flagParams[flag.paramKey],
       flag.objectPath,
-      coerceValue(value, flag.valueKind, flag.itemKind, '--' + flag.name),
+      coerceValue(value, flag.valueKind, flag.itemKind, '--' + flag.name, flag.nullableArray),
     );
   }
 
-  const stdin = await readStdinValue();
-  const params = mergeObjects(stdin, { ...flagParams, ...positionalParams });
-  const positionalArgs = definition.positional.map((param) => params[param.paramKey]);
+  const stdin = await readStdinValue(waitForStdin);
+  const stdinParams = wholeBodyStdinParams(definition, stdin);
+  const params = mergeObjects(stdinParams, { ...flagParams, ...positionalParams });
+  const positionalArgs = definition.positional.map((param) =>
+    hasInput(params, param.paramKey) ? params[param.paramKey] : undefined,
+  );
   // A positional path param is handed to the SDK method as a leading argument, and the method
   // never destructures it back out of `params` — only the path params it did *not* take
   // positionally are pulled out there. Leaving it in `params` makes it fall through the
@@ -1041,16 +1112,51 @@ const callArguments = async (
   const omitted = definition.positional.map((param) => param.paramKey);
   if (definition.transport === 'websocket') omitted.push('send');
   const sdkParams = omitParams(params, omitted);
+  // Query/header input alone does not activate an optional body. An empty stdin object is an
+  // explicit body; for required bodies stdin may also supply the empty remainder after query/header fields.
+  const nonBodyKeys = new Set(
+    [...definition.positional, ...definition.flags.filter((flag) => flag.location !== 'body')].map(
+      (flag) => flag.paramKey,
+    ),
+  );
+  const bodyPresent =
+    definition.bodyParamKey !== undefined
+      ? hasInput(params, definition.bodyParamKey) || hasInput(params, 'body')
+      : Object.keys(sdkParams).some((key) => !nonBodyKeys.has(key)) ||
+        (stdin !== undefined && (definition.bodyRequired === true || Object.keys(stdin).length === 0));
 
-  if (definition.callShape === 'options') return { args: [...positionalArgs, undefined], params };
+  if (definition.callShape === 'options')
+    return { args: [...positionalArgs, undefined], params, bodyPresent };
   if (definition.callShape === 'body')
-    return { args: [...positionalArgs, bodyValue(sdkParams, definition), undefined], params };
-  return { args: [...positionalArgs, paramsValue(sdkParams, definition), undefined], params };
+    return { args: [...positionalArgs, bodyValue(sdkParams, definition), undefined], params, bodyPresent };
+  return { args: [...positionalArgs, paramsValue(sdkParams, definition), undefined], params, bodyPresent };
+};
+
+/** Normalize a bare stdin object onto the same whole-body key as its blob flag. */
+const wholeBodyStdinParams = (
+  definition: CliCommandDefinition,
+  stdin: Record<string, unknown> | undefined,
+): Record<string, unknown> => {
+  const key = definition.bodyParamKey;
+  if (stdin === undefined) return {};
+  if (key === undefined || hasInput(stdin, key)) return stdin;
+  if (hasInput(stdin, 'body')) return { ...omitParams(stdin, ['body']), [key]: stdin.body };
+  const nonBodyKeys = [
+    ...definition.positional,
+    ...definition.flags.filter((flag) => flag.location !== 'body'),
+  ].map((flag) => flag.paramKey);
+  const body = omitParams(stdin, nonBodyKeys);
+  // Query/header input on its own must not invent a missing whole-body blob.
+  if (Object.keys(body).length === 0 && Object.keys(stdin).length > 0) return stdin;
+  return {
+    ...Object.fromEntries(Object.entries(stdin).filter(([name]) => nonBodyKeys.includes(name))),
+    [key]: body,
+  };
 };
 
 const paramsValue = (params: Record<string, unknown>, definition: CliCommandDefinition): unknown => {
   if (definition.bodyParamKey === undefined) return params;
-  const body = params[definition.bodyParamKey];
+  const body = hasInput(params, definition.bodyParamKey) ? params[definition.bodyParamKey] : undefined;
   if (body === undefined) return params;
   // Scoped union bodies with headers are typed as the params root. A `--body` JSON blob therefore
   // needs to sit beside header/query flags, or be passed as the root when it cannot be merged.
@@ -1065,58 +1171,73 @@ const bodyValue = (params: Record<string, unknown>, definition: CliCommandDefini
   // logical body as many and re-wrap it under the param key. `params.body` covers a bare value
   // piped via stdin.
   if (definition.bodyParamKey !== undefined) {
-    if (params[definition.bodyParamKey] !== undefined) return params[definition.bodyParamKey];
-    if (params.body !== undefined) return params.body;
+    if (hasInput(params, definition.bodyParamKey)) return params[definition.bodyParamKey];
+    if (hasInput(params, 'body')) return params.body;
   }
   // A flattenable body is reassembled from its per-property flags into a single object. Leaf flags
   // share their parent property key, so keying by paramKey collapses them back onto that property.
   const bodyFlags = definition.flags.filter((flag) => flag.location === 'body' && flag.paramKey !== 'send');
-  const body: Record<string, unknown> = {};
+  const body: Record<string, unknown> = Object.create(null);
   for (const flag of bodyFlags) {
-    if (params[flag.paramKey] !== undefined) body[flag.paramKey] = params[flag.paramKey];
+    if (hasInput(params, flag.paramKey)) body[flag.paramKey] = params[flag.paramKey];
   }
   return Object.keys(body).length > 0 ? body : params;
 };
 
-const readStdinValue = async (): Promise<Record<string, unknown>> => {
-  if (processStdin.isTTY) return {};
-  const source = await readStdinSource();
-  if (!source) return {};
+/** Preserve absence so an explicitly piped empty body can satisfy a required request body. */
+const readStdinValue = async (waitForInput = false): Promise<Record<string, unknown> | undefined> => {
+  if (processStdin.isTTY) return undefined;
+  const source = await readStdinSource(waitForInput);
+  if (!source) return undefined;
   const parsed = parseStructuredValue(source);
   if (parsed && typeof parsed === 'object' && !Array.isArray(parsed))
     return parsed as Record<string, unknown>;
   return { body: parsed };
 };
 
-const readStdinSource = async (): Promise<string> => {
+/** Detect automatic input without hanging on a parent process that leaves an empty pipe open. */
+const readStdinSource = async (waitForInput: boolean): Promise<string> => {
+  if (processStdin.readableEnded) return '';
   const chunks: Buffer[] = [];
   const done = new Promise<string>((resolve, reject) => {
+    let initialTimer: ReturnType<typeof setTimeout> | undefined;
+    let initialImmediate: ReturnType<typeof setImmediate> | undefined;
+    /** Release listeners and the initial deadline on every completion path. */
     const cleanup = () => {
-      clearTimeout(timer);
+      clearTimeout(initialTimer);
+      clearImmediate(initialImmediate);
       processStdin.off('data', onData);
       processStdin.off('end', onEnd);
       processStdin.off('error', onError);
       processStdin.pause();
     };
+    /** Once bytes arrive, wait through EOF so slow or multi-chunk JSON is never truncated. */
     const onData = (chunk: Buffer | string) => {
-      clearTimeout(timer);
+      clearTimeout(initialTimer);
+      clearImmediate(initialImmediate);
       chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
     };
+    /** Both EOF and an idle automatic-input pipe complete with the bytes collected so far. */
     const onEnd = () => {
       cleanup();
       resolve(Buffer.concat(chunks).toString('utf8').trim());
     };
+    /** Propagate read errors after releasing the stream. */
     const onError = (error: Error) => {
       cleanup();
       reject(error);
     };
-    const timer = setTimeout(() => {
-      cleanup();
-      resolve('');
-    }, 25);
+    /** Give ready pipe reads a poll turn before an overdue timer can declare input absent. */
+    const onIdle = () => {
+      initialImmediate = setImmediate(() => {
+        if (chunks.length === 0) onEnd();
+      });
+    };
     processStdin.on('data', onData);
     processStdin.on('end', onEnd);
     processStdin.on('error', onError);
+    // Node subprocess defaults leave stdin open. Only --stdin promises that a producer will write.
+    if (!waitForInput) initialTimer = setTimeout(onIdle, 25);
   });
   processStdin.resume();
   return done;
@@ -1140,11 +1261,18 @@ const setNestedValue = (
   path: readonly string[],
   value: unknown,
 ): Record<string, unknown> => {
-  const root = isPlainObject(target) ? { ...target } : {};
+  // Each level treats spec-derived keys as data, including __proto__.
+  const root: Record<string, unknown> = Object.assign(
+    Object.create(null),
+    isPlainObject(target) ? target : {},
+  );
   let cursor = root;
   for (const segment of path.slice(0, -1)) {
     const existing = cursor[segment];
-    const next = isPlainObject(existing) ? { ...existing } : {};
+    const next: Record<string, unknown> = Object.assign(
+      Object.create(null),
+      isPlainObject(existing) ? existing : {},
+    );
     cursor[segment] = next;
     cursor = next;
   }
@@ -1332,15 +1460,22 @@ const clientOptionValue = (value: string, option: CliClientOptionDefinition): un
   }
 };
 
+/** Decode flag values without treating file contents as further file-read instructions. */
 const coerceValue = (
   value: unknown,
   kind: CliValueKind,
   itemKind?: CliValueKind,
   label = 'value',
+  nullableArray = false,
 ): unknown => {
   if (Array.isArray(value)) {
     const elementKind = kind === 'array' ? (itemKind ?? 'unknown') : kind;
-    return value.map((item) => coerceValue(item, elementKind, undefined, label));
+    const items = value.map((item) => coerceValue(item, elementKind, undefined, label));
+    // A lone null still names the whole nullable array; repeated values remain array items.
+    if (nullableArray && items.length === 1 && items[0] === null) return null;
+    // One occurrence may carry a whole object array. Flatten only that schema: string items
+    // stay literal, and arrays of arrays retain their item boundaries.
+    return kind === 'array' && itemKind === 'object' ? items.flat(1) : items;
   }
   if (typeof value !== 'string') return value;
   // A file field takes bytes, and a path is the only thing a command line can carry. The stream is
@@ -1449,7 +1584,7 @@ const handleWebSocket = async (
     if (sendValue !== undefined) sendSocketValue(socket, sendValue);
     if (!processStdin.isTTY) {
       const stdin = await readStdinValue();
-      if (Object.keys(stdin).length > 0) sendSocketValue(socket, stdin.body ?? stdin);
+      if (stdin && Object.keys(stdin).length > 0) sendSocketValue(socket, stdin.body ?? stdin);
     }
     await output;
   } finally {
@@ -1495,7 +1630,8 @@ const collectIterable = async (value: AsyncIterable<unknown>, maxItems?: number)
 };
 
 // `auto` renders like `json` (2-space pretty-printed): `pretty` is reserved for the distinct
-// human-readable card view, matching common CLI defaults.
+// human-readable view (a table for a list of objects, a card for anything else), matching common
+// CLI defaults.
 const serializeOutput = (value: unknown, options: OutputOptions): string => {
   const normalized = options.format === 'auto' ? 'json' : options.format;
   const tty = Boolean(processStdout.isTTY);
@@ -1503,7 +1639,7 @@ const serializeOutput = (value: unknown, options: OutputOptions): string => {
   const safeValue = value === undefined ? null : value;
   if (normalized === 'raw' && typeof safeValue === 'string')
     return tty ? stripControls(safeValue) : safeValue;
-  if (normalized === 'pretty') return prettyCard(safeValue, options);
+  if (normalized === 'pretty') return prettyTable(safeValue, options) ?? prettyCard(safeValue, options);
   const text = serializeData(safeValue, normalized);
   return tty ? escapeControls(text) : text;
 };
@@ -1524,7 +1660,7 @@ const serializeData = (value: unknown, format: OutputFormat): string => {
 // them, so text bound for a terminal is cleaned here. Tab, newline and a CRLF line ending are
 // layout, not commands; a lone CR is not, since it returns the cursor to overwrite the line.
 // A pipe or file still gets the exact bytes, which is what a script reading the output needs; only
-// the `pretty` card, laid out for a person, is cleaned wherever it goes.
+// the `pretty` card and table, laid out for a person, are cleaned wherever they go.
 // biome-ignore lint/suspicious/noControlCharactersInRegex: matching them is the point.
 const TERMINAL_CONTROLS = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f]|\r(?!\n)/gu;
 
@@ -1538,36 +1674,80 @@ const stripControls = (text: string): string => text.replace(TERMINAL_CONTROLS, 
 const escapeControls = (text: string): string =>
   text.replace(TERMINAL_CONTROLS, (char) => '\\u' + char.charCodeAt(0).toString(16).padStart(4, '0'));
 
-// Human-readable `pretty` view: a bordered key/value card titled with the command path,
-// rendering booleans as yes/no and array entries as numbered items.
+/** Keeps nesting indentation distinct from leading spaces supplied by the response. */
+type CardLine = { indent: string; content: string };
+
+/** One drawn card row with the cells it takes, so the frame is padded without measuring it again. */
+type CardRow = { text: string; width: number };
+
+/** A key/value card that wraps to the terminal without cutting values or splitting glyphs. */
 const prettyCard = (value: unknown, options: OutputOptions): string => {
-  const lines = prettyLines(value, '');
-  const width = Math.max(0, ...lines.map((line) => line.length));
-  const body = lines.length > 0 ? lines : [''];
+  const limit = prettyWidthLimit();
+  // Four cells belong to the frame; leave at least two for a wide glyph, or omit the frame.
+  const framed = limit >= 6;
+  const rows = prettyLines(value, '').flatMap((line) => wrapCardLine(line, framed ? limit - 4 : limit));
+  const width = rows.reduce((max, row) => Math.max(max, row.width), 0);
+  const body = rows.length > 0 ? rows : [{ text: '', width: 0 }];
+  const title = options.title
+    ? wrapCardLine({ indent: '  ', content: cardText(options.title) }, limit).map((row) => row.text)
+    : [];
+  if (!framed) return [...title, ...body.map((row) => row.text)].join('\n');
   return [
-    ...(options.title ? ['  ' + options.title] : []),
+    ...title,
     '\u256d' + '\u2500'.repeat(width + 2) + '\u256e',
-    ...body.map((line) => '\u2502 ' + line.padEnd(width, ' ') + ' \u2502'),
+    ...body.map((row) => '\u2502 ' + row.text + ' '.repeat(width - row.width) + ' \u2502'),
     '\u2570' + '\u2500'.repeat(width + 2) + '\u256f',
   ].join('\n');
 };
 
-const prettyLines = (value: unknown, indent: string): string[] => {
+/**
+ * Wraps one card line to `width` cells. Continuation rows sit two cells deeper than the line they
+ * continue, so a wrapped value cannot read as a sibling key; both indents are capped to leave two
+ * cells for content, and only structural indentation is reduced, never spaces from the response.
+ */
+const wrapCardLine = ({ indent, content }: CardLine, width: number): CardRow[] => {
+  const parts = glyphs(content);
+  // The indent is spaces only, so its length is its width.
+  const natural = indent.length + parts.reduce((sum, glyph) => sum + glyph.width, 0);
+  if (natural <= width) return [{ text: indent + content, width: natural }];
+  const first = indent.slice(0, Math.max(0, width - 2));
+  const continuation = (indent + '  ').slice(0, Math.max(0, width - 2));
+  const rows: CardRow[] = [];
+  let line = first;
+  let used = first.length;
+  for (const glyph of parts) {
+    // A one-cell terminal cannot draw a two-cell glyph at all; keep even that fallback bounded.
+    const part = glyph.width > width ? { text: '\ufffd', width: 1 } : glyph;
+    if (used + part.width > width) {
+      rows.push({ text: line, width: used });
+      line = continuation;
+      used = continuation.length;
+    }
+    line += part.text;
+    used += part.width;
+  }
+  rows.push({ text: line, width: used });
+  return rows;
+};
+
+/** Records the formatting prefix before a response key or value can contribute its own spaces. */
+const prettyLines = (value: unknown, indent: string): CardLine[] => {
   if (Array.isArray(value)) {
     return value.flatMap((item, index) => {
-      const label = indent + (index + 1) + '.';
-      if (item && typeof item === 'object') return [label, ...prettyLines(item, indent + '  ')];
-      return [label + ' ' + prettyScalar(item)];
+      const label = String(index + 1) + '.';
+      if (item && typeof item === 'object')
+        return [{ indent, content: label }, ...prettyLines(item, indent + '  ')];
+      return [{ indent, content: label + ' ' + prettyScalar(item) }];
     });
   }
   if (value && typeof value === 'object') {
     return Object.entries(value as Record<string, unknown>).flatMap(([key, entry]) => {
       if (entry && typeof entry === 'object')
-        return [indent + cardText(key) + ':', ...prettyLines(entry, indent + '  ')];
-      return [indent + cardText(key) + ': ' + prettyScalar(entry)];
+        return [{ indent, content: cardText(key) + ':' }, ...prettyLines(entry, indent + '  ')];
+      return [{ indent, content: cardText(key) + ': ' + prettyScalar(entry) }];
     });
   }
-  return [indent + prettyScalar(value)];
+  return [{ indent, content: prettyScalar(value) }];
 };
 
 // The card is laid out line by line, so a value or key keeps no control character at all: a
@@ -1579,8 +1759,216 @@ const prettyScalar = (value: unknown): string => {
   return cardText(String(value));
 };
 
-/** Text for one line of the pretty card: every control character, tab and newline included, removed. */
+/** Text for one line of the pretty card or one table cell: every control character, tab and newline included, removed. */
 const cardText = (text: string): string => stripControls(text).replace(/\r?\n|\t/gu, ' ');
+
+/**
+ * The `pretty` view of a list of objects: one table, a row per item and a column per field, so items
+ * can be compared down a column where the card gives each its own block of lines. `undefined` for
+ * anything else, and for a list too wide for the terminal even with every column cut to its
+ * narrowest, which the caller then draws as the card.
+ */
+const prettyTable = (value: unknown, options: OutputOptions): string | undefined => {
+  if (!Array.isArray(value) || value.length === 0 || !value.every(isTableRow)) return undefined;
+  const rows = value as Record<string, unknown>[];
+  // Columns follow the order fields first appear in, so a field only later items carry still gets one.
+  const keys = [...new Set(rows.flatMap((row) => Object.keys(row)))];
+  if (keys.length === 0) return undefined;
+  const header = keys.map((key) => tableText(cardText(key)));
+  const cells = rows.map((row) =>
+    keys.map((key) => (Object.hasOwn(row, key) ? tableText(tableCell(row[key])) : '')),
+  );
+  const natural = header.map((text, index) =>
+    Math.max(textWidth(text), ...cells.map((cell) => textWidth(cell[index] ?? ''))),
+  );
+  const widths = fitColumns(natural, prettyWidthLimit());
+  if (!widths) return undefined;
+  /** A horizontal border, with `middle` where it crosses each column separator. */
+  const rule = (left: string, middle: string, right: string): string =>
+    left + widths.map((width) => '\u2500'.repeat(width + 2)).join(middle) + right;
+  /** One row of cells, each padded or cut to its column. */
+  const line = (texts: readonly string[]): string =>
+    '\u2502' +
+    texts.map((text, index) => ' ' + fitText(text, widths[index] ?? 0) + ' ').join('\u2502') +
+    '\u2502';
+  return [
+    ...(options.title ? ['  ' + options.title] : []),
+    rule('\u256d', '\u252c', '\u256e'),
+    line(header),
+    rule('\u251c', '\u253c', '\u2524'),
+    ...cells.map(line),
+    rule('\u2570', '\u2534', '\u256f'),
+  ].join('\n');
+};
+
+// Explicit direction controls (embeddings, overrides, isolates). A terminal that implements bidi
+// would carry one a cell left open, or one a cut separated from its closer, across the borders and
+// the later cells of its row; the card keeps each field on its own line, but a table row joins them.
+// They are dropped, and `isolateCell` puts back one isolate per cell that is always closed.
+const DIRECTION_CONTROLS = /[\u202a-\u202e\u2066-\u2069]/gu;
+
+/** Table text without the direction controls the server sent, which `isolateCell` replaces. */
+const tableText = (text: string): string => text.replace(DIRECTION_CONTROLS, '');
+
+// Characters of the right-to-left scripts (Hebrew, Arabic, Syriac, Thaana, NKo and their
+// presentation forms and supplementary blocks), and the right-to-left mark, which Hebrew-locale
+// number formatting puts around an amount that holds no letter of its own.
+const RIGHT_TO_LEFT =
+  /[\u200f\u0590-\u08ff\ufb1d-\ufdff\ufe70-\ufefc\u{10800}-\u{10fff}\u{1e800}-\u{1efff}]/u;
+
+/**
+ * Wraps a cell holding right-to-left text in a first-strong isolate (U+2068 to U+2069). Without one,
+ * a terminal that implements bidi reads the spaces and border between two right-to-left cells as part
+ * of one right-to-left run and swaps the two cells between their columns. The isolate is
+ * added after the cell is cut, so it is always closed, and it takes no cell. Other cells are left
+ * as they are, so a table of left-to-right text carries no invisible characters.
+ */
+const isolateCell = (text: string): string => (RIGHT_TO_LEFT.test(text) ? '\u2068' + text + '\u2069' : text);
+
+/** Whether a list item can be a table row: an object that is not itself a list. */
+const isTableRow = (item: unknown): boolean =>
+  item !== null && typeof item === 'object' && !Array.isArray(item);
+
+/**
+ * The text of one table cell, always a single line: a list of plain values is joined, a list of
+ * objects shows its size, and an object lists its fields inline with anything nested inside it
+ * summarized the same way. `--transform` draws a nested list as a table of its own.
+ */
+const tableCell = (value: unknown): string => {
+  if (Array.isArray(value) && !value.some(isNested)) return value.map(prettyScalar).join(', ');
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    return Object.entries(value as Record<string, unknown>)
+      .map(
+        ([key, entry]) =>
+          cardText(key) + ': ' + (isNested(entry) ? nestedSummary(entry) : prettyScalar(entry)),
+      )
+      .join(', ');
+  }
+  return isNested(value) ? nestedSummary(value) : prettyScalar(value);
+};
+
+/** Whether a value is a list or an object, which a table cell summarizes rather than spells out. */
+const isNested = (value: unknown): boolean => value !== null && typeof value === 'object';
+
+/** The short form of a nested value inside a cell: a list by its size, an object as a placeholder. */
+const nestedSummary = (value: unknown): string => {
+  if (!Array.isArray(value)) return '{\u2026}';
+  return value.length + (value.length === 1 ? ' item' : ' items');
+};
+
+/**
+ * How many cells wide pretty output may be. A pipe or file keeps every value at full width.
+ */
+const prettyWidthLimit = (): number =>
+  processStdout.isTTY
+    ? Math.max(1, Math.floor(Number(processStdout.columns) || 80))
+    : Number.POSITIVE_INFINITY;
+
+// The narrowest a column is cut to. Below this a cut value is a stub that can be neither read nor
+// copied (`3f\u2026`, `cr\u2026`), and the card, which shows every value whole, serves a person better.
+const MIN_COLUMN_WIDTH = 10;
+
+/**
+ * Column widths that fit `limit` terminal cells, or `undefined` when a cut column would be narrower
+ * than `MIN_COLUMN_WIDTH`.
+ * Every column is capped at one shared width, the largest that fits, so the widest columns give way
+ * first and a narrow one keeps its full text. Each column adds two spaces of padding and a border.
+ */
+const fitColumns = (natural: readonly number[], limit: number): number[] | undefined => {
+  /** The table width with every column capped at `cap`: the left border, then per column its text, two spaces and a border. */
+  const total = (cap: number): number => natural.reduce((sum, width) => sum + Math.min(width, cap) + 3, 1);
+  let high = Math.max(...natural);
+  if (total(high) <= limit) return [...natural];
+  let low = MIN_COLUMN_WIDTH;
+  if (total(low) > limit) return undefined;
+  while (low < high) {
+    const middle = Math.ceil((low + high) / 2);
+    if (total(middle) <= limit) low = middle;
+    else high = middle - 1;
+  }
+  return natural.map((width) => Math.min(width, low));
+};
+
+/** `text` padded to exactly `width` cells, or cut short with an ellipsis when it is wider. */
+const fitText = (text: string, width: number): string => {
+  const parts = glyphs(text);
+  const full = parts.reduce((sum, glyph) => sum + glyph.width, 0);
+  if (full <= width) return isolateCell(text) + ' '.repeat(width - full);
+  let kept = '';
+  let used = 0;
+  for (const glyph of parts) {
+    if (used + glyph.width > width - 1) break;
+    kept += glyph.text;
+    used += glyph.width;
+  }
+  // A wide character that does not fit leaves a cell over, which padding fills.
+  return isolateCell(kept + '\u2026') + ' '.repeat(width - 1 - used);
+};
+
+// A table lines up only if every cell is measured in terminal cells rather than UTF-16 units: CJK
+// text and emoji take two cells, and combining marks and zero-width characters take none. The
+// ranges are the East Asian Wide blocks and the emoji most API data carries (status marks such as
+// U+2705 and U+274C among them). They are an approximation of a full width table: a character
+// outside them that a terminal draws wide, or one of the few symbols inside the emoji blocks drawn
+// one cell wide unless U+FE0F follows (U+1F5D1, U+1F6E0), shifts the borders of its own row by one.
+const WIDE_CHARACTER =
+  /[\u1100-\u115f\u231a\u231b\u23e9-\u23ec\u23f0\u23f3\u25fd\u25fe\u2614\u2615\u2648-\u2653\u267f\u2693\u26a1\u26aa\u26ab\u26bd\u26be\u26c4\u26c5\u26ce\u26d4\u26ea\u26f2\u26f3\u26f5\u26fa\u26fd\u2705\u270a\u270b\u2728\u274c\u274e\u2753-\u2755\u2757\u2795-\u2797\u27b0\u27bf\u2b1b\u2b1c\u2b50\u2b55\u2e80-\u303e\u3041-\u33ff\u3400-\u4dbf\u4e00-\u9fff\ua000-\ua4cf\uac00-\ud7a3\uf900-\ufaff\ufe30-\ufe4f\uff00-\uff60\uffe0-\uffe6\u{1f004}\u{1f0cf}\u{1f18e}\u{1f191}-\u{1f19a}\u{1f200}-\u{1f2ff}\u{1f300}-\u{1f64f}\u{1f680}-\u{1f6ff}\u{1f7e0}-\u{1f7eb}\u{1f900}-\u{1f9ff}\u{1fa70}-\u{1faff}\u{20000}-\u{3fffd}]/u;
+// Non-spacing and enclosing marks and invisible format characters (joiners, direction controls, the
+// tag characters of a subdivision flag) take no cell. The soft hyphen is the one format character
+// terminals draw, and a spacing mark (a Devanagari vowel sign) takes a cell of its own.
+const ZERO_WIDTH_CHARACTER = /(?!\u00ad)[\p{Mn}\p{Me}\p{Cf}]/u;
+
+// Characters that draw nothing of their own after a wide glyph: the skin-tone modifiers, which a
+// terminal draws inside the emoji before them, and the vowel and final jamo that complete a Hangul
+// syllable written as separate jamo (as macOS writes Korean file names).
+const ATTACHES_TO_WIDE = /[\u1160-\u11ff\ud7b0-\ud7ff\u{1f3fb}-\u{1f3ff}]/u;
+
+/** Two regional indicators form one country-flag glyph, taking two cells together. */
+const REGIONAL_INDICATOR = /^[\u{1f1e6}-\u{1f1ff}]$/u;
+
+/** One thing a terminal draws: a base character with the marks, joiners and selectors attached to it. */
+type Glyph = { text: string; width: number };
+
+/**
+ * Splits `text` into the glyphs a terminal draws, each with the cells it takes. A combining mark or
+ * zero-width character joins the glyph before it, as does the character after a zero-width joiner
+ * that follows an emoji (a family or profession emoji is one glyph); in other scripts the joiner only
+ * shapes its neighbours, which keep their own cells. U+FE0F asks for the emoji form of the character
+ * before it, which terminals draw two cells wide even when the bare character takes one. Truncating
+ * by glyph keeps an accent or a joined emoji from being split from its base. A skin-tone modifier, and
+ * the jamo that complete a Hangul syllable, join a wide glyph before them without widening it.
+ */
+const glyphs = (text: string): Glyph[] => {
+  const parts: Glyph[] = [];
+  let joined = false;
+  for (const char of text) {
+    const last = parts[parts.length - 1];
+    // Pair only a single preceding indicator, so consecutive flags stay separate glyphs.
+    if (last && REGIONAL_INDICATOR.test(last.text) && REGIONAL_INDICATOR.test(char)) {
+      last.text += char;
+      last.width = 2;
+      continue;
+    }
+    if (
+      last &&
+      (joined || ZERO_WIDTH_CHARACTER.test(char) || (last.width === 2 && ATTACHES_TO_WIDE.test(char)))
+    ) {
+      last.text += char;
+      if (char === '\ufe0f') last.width = Math.max(last.width, 2);
+      joined = char === '\u200d' && last.width === 2;
+      continue;
+    }
+    parts.push({
+      text: char,
+      width: ZERO_WIDTH_CHARACTER.test(char) ? 0 : WIDE_CHARACTER.test(char) ? 2 : 1,
+    });
+    joined = false;
+  }
+  return parts;
+};
+
+/** How many terminal cells `text` takes. */
+const textWidth = (text: string): number => glyphs(text).reduce((sum, glyph) => sum + glyph.width, 0);
 
 const writeError = async (
   error: unknown,

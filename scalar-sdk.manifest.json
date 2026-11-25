@@ -1,7 +1,7 @@
 {
   "name": "ScalarGalaxy",
   "slug": "scalarGalaxy",
-  "generatorVersion": "0.43.1",
+  "generatorVersion": "0.46.2",
   "servers": [
     "https://galaxy.scalar.com",
     "{protocol}://void.scalar.com/{path}"
@@ -2829,5 +2829,367 @@
         "publicAliases": []
       }
     }
-  ]
+  ],
+  "cli": {
+    "commands": [
+      {
+        "path": [
+          "planets",
+          "list"
+        ],
+        "source": "generated",
+        "aliases": [],
+        "hidden": false,
+        "arguments": [],
+        "flags": [
+          {
+            "flags": "--limit <value>",
+            "mandatory": false
+          },
+          {
+            "flags": "--offset <value>",
+            "mandatory": false
+          }
+        ]
+      },
+      {
+        "path": [
+          "planets",
+          "create"
+        ],
+        "source": "generated",
+        "aliases": [],
+        "hidden": false,
+        "arguments": [],
+        "flags": [
+          {
+            "flags": "--name <value>",
+            "mandatory": false
+          },
+          {
+            "flags": "--description <value>",
+            "mandatory": false
+          },
+          {
+            "flags": "--type <value>",
+            "mandatory": false
+          },
+          {
+            "flags": "--habitability-index <value>",
+            "mandatory": false
+          },
+          {
+            "flags": "--physical-properties <value>",
+            "mandatory": false
+          },
+          {
+            "flags": "--physical-properties.mass <value>",
+            "mandatory": false
+          },
+          {
+            "flags": "--physical-properties.radius <value>",
+            "mandatory": false
+          },
+          {
+            "flags": "--physical-properties.gravity <value>",
+            "mandatory": false
+          },
+          {
+            "flags": "--physical-properties.temperature <value>",
+            "mandatory": false
+          },
+          {
+            "flags": "--physical-properties.temperature.min <value>",
+            "mandatory": false
+          },
+          {
+            "flags": "--physical-properties.temperature.max <value>",
+            "mandatory": false
+          },
+          {
+            "flags": "--physical-properties.temperature.average <value>",
+            "mandatory": false
+          },
+          {
+            "flags": "--atmosphere <value>",
+            "mandatory": false
+          },
+          {
+            "flags": "--discovered-at <value>",
+            "mandatory": false
+          },
+          {
+            "flags": "--image <value>",
+            "mandatory": false
+          },
+          {
+            "flags": "--satellite <value>",
+            "mandatory": false
+          },
+          {
+            "flags": "--creator <value>",
+            "mandatory": false
+          },
+          {
+            "flags": "--creator.name <value>",
+            "mandatory": false
+          },
+          {
+            "flags": "--tag <value>",
+            "mandatory": false
+          },
+          {
+            "flags": "--success-callback-url <value>",
+            "mandatory": false
+          },
+          {
+            "flags": "--failure-callback-url <value>",
+            "mandatory": false
+          }
+        ]
+      },
+      {
+        "path": [
+          "planets",
+          "retrieve"
+        ],
+        "source": "generated",
+        "aliases": [],
+        "hidden": false,
+        "arguments": [
+          {
+            "name": "planet-id",
+            "required": false,
+            "variadic": false
+          }
+        ],
+        "flags": [
+          {
+            "flags": "--planet-id <value>",
+            "mandatory": false
+          }
+        ]
+      },
+      {
+        "path": [
+          "planets",
+          "update"
+        ],
+        "source": "generated",
+        "aliases": [],
+        "hidden": false,
+        "arguments": [
+          {
+            "name": "planet-id",
+            "required": false,
+            "variadic": false
+          }
+        ],
+        "flags": [
+          {
+            "flags": "--name <value>",
+            "mandatory": false
+          },
+          {
+            "flags": "--description <value>",
+            "mandatory": false
+          },
+          {
+            "flags": "--type <value>",
+            "mandatory": false
+          },
+          {
+            "flags": "--habitability-index <value>",
+            "mandatory": false
+          },
+          {
+            "flags": "--physical-properties <value>",
+            "mandatory": false
+          },
+          {
+            "flags": "--physical-properties.mass <value>",
+            "mandatory": false
+          },
+          {
+            "flags": "--physical-properties.radius <value>",
+            "mandatory": false
+          },
+          {
+            "flags": "--physical-properties.gravity <value>",
+            "mandatory": false
+          },
+          {
+            "flags": "--physical-properties.temperature <value>",
+            "mandatory": false
+          },
+          {
+            "flags": "--physical-properties.temperature.min <value>",
+            "mandatory": false
+          },
+          {
+            "flags": "--physical-properties.temperature.max <value>",
+            "mandatory": false
+          },
+          {
+            "flags": "--physical-properties.temperature.average <value>",
+            "mandatory": false
+          },
+          {
+            "flags": "--atmosphere <value>",
+            "mandatory": false
+          },
+          {
+            "flags": "--discovered-at <value>",
+            "mandatory": false
+          },
+          {
+            "flags": "--image <value>",
+            "mandatory": false
+          },
+          {
+            "flags": "--satellite <value>",
+            "mandatory": false
+          },
+          {
+            "flags": "--creator <value>",
+            "mandatory": false
+          },
+          {
+            "flags": "--creator.name <value>",
+            "mandatory": false
+          },
+          {
+            "flags": "--tag <value>",
+            "mandatory": false
+          },
+          {
+            "flags": "--success-callback-url <value>",
+            "mandatory": false
+          },
+          {
+            "flags": "--failure-callback-url <value>",
+            "mandatory": false
+          },
+          {
+            "flags": "--planet-id <value>",
+            "mandatory": false
+          }
+        ]
+      },
+      {
+        "path": [
+          "planets",
+          "delete"
+        ],
+        "source": "generated",
+        "aliases": [],
+        "hidden": false,
+        "arguments": [
+          {
+            "name": "planet-id",
+            "required": false,
+            "variadic": false
+          }
+        ],
+        "flags": [
+          {
+            "flags": "--planet-id <value>",
+            "mandatory": false
+          }
+        ]
+      },
+      {
+        "path": [
+          "planets",
+          "upload-image"
+        ],
+        "source": "generated",
+        "aliases": [],
+        "hidden": false,
+        "arguments": [
+          {
+            "name": "planet-id",
+            "required": false,
+            "variadic": false
+          }
+        ],
+        "flags": [
+          {
+            "flags": "--image <path>",
+            "mandatory": false
+          },
+          {
+            "flags": "--planet-id <value>",
+            "mandatory": false
+          }
+        ]
+      },
+      {
+        "path": [
+          "celestial-bodies",
+          "create"
+        ],
+        "source": "generated",
+        "aliases": [],
+        "hidden": false,
+        "arguments": [],
+        "flags": []
+      },
+      {
+        "path": [
+          "authentication",
+          "create-user"
+        ],
+        "source": "generated",
+        "aliases": [],
+        "hidden": false,
+        "arguments": [],
+        "flags": [
+          {
+            "flags": "--name <value>",
+            "mandatory": false
+          },
+          {
+            "flags": "--email <value>",
+            "mandatory": false
+          },
+          {
+            "flags": "--password <value>",
+            "mandatory": false
+          }
+        ]
+      },
+      {
+        "path": [
+          "authentication",
+          "create-token"
+        ],
+        "source": "generated",
+        "aliases": [],
+        "hidden": false,
+        "arguments": [],
+        "flags": [
+          {
+            "flags": "--email <value>",
+            "mandatory": false
+          },
+          {
+            "flags": "--password <value>",
+            "mandatory": false
+          }
+        ]
+      },
+      {
+        "path": [
+          "authentication",
+          "list-me"
+        ],
+        "source": "generated",
+        "aliases": [],
+        "hidden": false,
+        "arguments": [],
+        "flags": []
+      }
+    ]
+  }
 }
