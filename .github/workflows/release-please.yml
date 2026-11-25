@@ -394,13 +394,29 @@ jobs:
           </plist>
           PLIST
 
+          # Every signature is timestamped against Apple's time-stamp server, a network request that
+          # occasionally fails outright. rcodesign builds the whole signature, time stamp included,
+          # before it rewrites the binary, and signing again replaces any signature already there,
+          # so a failed attempt is safe to repeat; a few spaced retries keep one dropped request
+          # from failing the release. A failure that is not transient fails all three attempts and
+          # prints rcodesign's own error each time.
           for target in darwin-x64 darwin-arm64; do
-            "$RCODESIGN" sign \
-              --pem-file "$SIGNING_DIR/certificate.pem" \
-              --pem-file "$SIGNING_DIR/chain.pem" \
-              --entitlements-xml-file "$SIGNING_DIR/entitlements.plist" \
-              --for-notarization \
-              "compile-out/${target}/galaxy"
+            for attempt in 1 2 3; do
+              if "$RCODESIGN" sign \
+                --pem-file "$SIGNING_DIR/certificate.pem" \
+                --pem-file "$SIGNING_DIR/chain.pem" \
+                --entitlements-xml-file "$SIGNING_DIR/entitlements.plist" \
+                --for-notarization \
+                "compile-out/${target}/galaxy"; then
+                break
+              fi
+              if [ "$attempt" = 3 ]; then
+                echo "::error::Signing compile-out/${target}/galaxy failed three times; see rcodesign's error above." >&2
+                exit 1
+              fi
+              echo "::warning::Signing compile-out/${target}/galaxy failed (attempt ${attempt} of 3); retrying in $((attempt * 15)) seconds." >&2
+              sleep $((attempt * 15))
+            done
           done
           # A Developer ID signature alone is not enough; Gatekeeper still blocks the binary on
           # download until Apple has notarized it. The notary service accepts an archive rather than a bare
